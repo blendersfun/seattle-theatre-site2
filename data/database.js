@@ -1,33 +1,84 @@
-/**
- *  Copyright (c) 2015, Facebook, Inc.
- *  All rights reserved.
- *
- *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant
- *  of patent rights can be found in the PATENTS file in the same directory.
- */
+"use strict";
+
+import mysql from "mysql";
 
 // Model types
-class User extends Object {}
-class Widget extends Object {}
+class Root {}
+class ProducingOrg {
+  constructor(name, missionStatement) {
+    this.name = name;
+    this.missionStatement = missionStatement;
+  }
+}
 
-// Mock data
-var viewer = new User();
-viewer.id = '1';
-viewer.name = 'Anonymous';
-var widgets = ['What\'s-it', 'Who\'s-it', 'How\'s-it'].map((name, i) => {
-  var widget = new Widget();
-  widget.name = name;
-  widget.id = `${i}`;
-  return widget;
-});
+// Database interaction methods
+function getMysqlConnection() {
+  var connection = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'seattle_theatre'
+  });
+  connection.connect();
+  return connection;
+}
+function getRoot() {
+  return new Promise((resolve, reject) => {
+    var root = new Root();
+    root.id = 1;
+    getProducingOrgs().then(
+      result => {
+        root.producingOrgs = result;
+        resolve(root);
+      }, 
+      rejectReason => reject('Failed to get producing orgs because: ' + rejectReason)
+    );
+  });
+}
+function getProducingOrgs() {
+  return new Promise((resolve, reject) => {
+    var connection = getMysqlConnection();
+    var orgs = [];
+    connection.query("select * from producing_org", (err, results) => {
+      if (err) {
+        reject('Error occurred executing mysql query: ' + err);
+      } else {
+        for (var i = 0; i < results.length; i++) {
+          var org = new ProducingOrg();
+          org.id = results[i].id;
+          org.name = results[i].name;
+          org.missionStatement = results[i].mission_statement;
+          orgs.push(org);
+        }
+        resolve(orgs);
+      }
+    });
+    connection.end();
+  });
+}
+function getProducingOrg(id) {
+  return new Promise((resolve, reject) => {
+    var connection = getMysqlConnection();
+    connection.query("select * from producing_org where id = ?", [id], 
+      (err, results) => {
+        if (err) {
+          reject('Error occurred executing mysql query: ' + err)
+        } else {
+          var org = new ProducingOrg();
+          org.id = results[0].id;
+          org.name = results[0].name;
+          org.missionStatement = results[0].mission_statement;
+          resolve(org);
+        }
+      });
+    connection.end();
+  });
+}
 
 module.exports = {
-  // Export methods that your schema can use to interact with your database
-  getUser: (id) => id === viewer.id ? viewer : null,
-  getViewer: () => viewer,
-  getWidget: (id) => widgets.find(w => w.id === id),
-  getWidgets: () => widgets,
-  User,
-  Widget,
+  getRoot,
+  getProducingOrgs,
+  getProducingOrg,
+  Root,
+  ProducingOrg,
 };

@@ -1,11 +1,4 @@
-/**
- *  Copyright (c) 2015, Facebook, Inc.
- *  All rights reserved.
- *
- *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant
- *  of patent rights can be found in the PATENTS file in the same directory.
- */
+"use strict";
 
 import {
   GraphQLBoolean,
@@ -29,15 +22,7 @@ import {
   nodeDefinitions,
 } from 'graphql-relay';
 
-import {
-  // Import methods that your schema can use to interact with your database
-  User,
-  Widget,
-  getUser,
-  getViewer,
-  getWidget,
-  getWidgets,
-} from './database';
+import db from './database';
 
 /**
  * We get the node interface and field from the Relay library.
@@ -48,19 +33,19 @@ import {
 var {nodeInterface, nodeField} = nodeDefinitions(
   (globalId) => {
     var {type, id} = fromGlobalId(globalId);
-    if (type === 'User') {
-      return getUser(id);
-    } else if (type === 'Widget') {
-      return getWidget(id);
+    if (type === 'Root') {
+      return db.getRoot(id);
+    } else if (type === 'ProducingOrg') {
+      return db.getProducingOrg(id);
     } else {
       return null;
     }
   },
   (obj) => {
-    if (obj instanceof User) {
-      return userType;
-    } else if (obj instanceof Widget)  {
-      return widgetType;
+    if (obj instanceof db.Root) {
+      return rootType;
+    } else if (obj instanceof db.ProducingOrg) {
+      return producingOrgType;
     } else {
       return null;
     }
@@ -71,29 +56,38 @@ var {nodeInterface, nodeField} = nodeDefinitions(
  * Define your own types here
  */
 
-var userType = new GraphQLObjectType({
-  name: 'User',
-  description: 'A person who uses our app',
+var rootType = new GraphQLObjectType({
+  name: 'Root',
+  description: 'The root object in the seattle-theatre schema.',
   fields: () => ({
-    id: globalIdField('User'),
-    widgets: {
-      type: widgetConnection,
-      description: 'A person\'s collection of widgets',
+    id: globalIdField('Root'),
+    producingOrgs: {
+      type: producingOrgConnection,
+      description: 'All producing organizations in the system.',
       args: connectionArgs,
-      resolve: (_, args) => connectionFromArray(getWidgets(), args),
-    },
+      resolve: (_, args) => 
+        new Promise((resolve, reject) => {
+          db.getProducingOrgs().then(
+            result => resolve(connectionFromArray(result, args)),
+            rejectReason => reject('Producing orgs could not be retrieved because: ' + rejectReason)
+          );
+        }),
+    }, 
   }),
   interfaces: [nodeInterface],
 });
-
-var widgetType = new GraphQLObjectType({
-  name: 'Widget',
-  description: 'A shiny widget',
+var producingOrgType = new GraphQLObjectType({
+  name: 'ProducingOrg',
+  description: 'An organization that produces theatrical events.',
   fields: () => ({
-    id: globalIdField('Widget'),
+    id: globalIdField('ProducingOrg'),
     name: {
       type: GraphQLString,
-      description: 'The name of the widget',
+      description: 'The name of the organization.',
+    },
+    missionStatement: {
+      type: GraphQLString,
+      description: 'The mission statement describing the organization\'s goals, artistic or otherwise.',
     },
   }),
   interfaces: [nodeInterface],
@@ -102,8 +96,8 @@ var widgetType = new GraphQLObjectType({
 /**
  * Define your own connection types here
  */
-var {connectionType: widgetConnection} =
-  connectionDefinitions({name: 'Widget', nodeType: widgetType});
+ var {connectionType: producingOrgConnection} =
+  connectionDefinitions({name: 'ProducingOrg', nodeType: producingOrgType});
 
 /**
  * This is the type that will be the root of our query,
@@ -113,10 +107,9 @@ var queryType = new GraphQLObjectType({
   name: 'Query',
   fields: () => ({
     node: nodeField,
-    // Add your own root fields here
-    viewer: {
-      type: userType,
-      resolve: () => getViewer(),
+    root: {
+      type: rootType,
+      resolve: () => db.getRoot(),
     },
   }),
 });
