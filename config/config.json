@@ -1,0 +1,11 @@
+{
+    "db": {
+        "host": "localhost",
+        "user": "root",
+        "password": "",
+        "databaseName": "seattle_theatre"
+    },
+    "auth": {
+        "secret": "horrid_baggins_groan_pinenuts"
+    }
+}
