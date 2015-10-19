@@ -5,6 +5,8 @@ import {
   GraphQLFloat,
   GraphQLID,
   GraphQLInt,
+  GraphQLEnumType,
+  GraphQLUnionType,
   GraphQLList,
   GraphQLNonNull,
   GraphQLInputObjectType,
@@ -63,6 +65,7 @@ var apiType = new GraphQLObjectType({
   description: 'The seattle-theatre server api.',
   fields: () => ({
     id: globalIdField('Api'),
+    authError: { type: authErrorType },
     authToken: { type: GraphQLString },
     user: {
       type: userType,
@@ -107,6 +110,15 @@ var userType = new GraphQLObjectType({
   interfaces: [nodeInterface],
 });
 
+var authErrorType = new GraphQLEnumType({
+  name: 'AuthError',
+  description: 'Error codes for authentication operations.',
+  values: {
+    USER_ALREADY_EXISTS: {},
+    INVALID_CREDENTIALS: {}
+  }
+});
+
 /*
  * Mutation: CreateUser
  *  Creates a user account and then returns an authToken (so that
@@ -131,9 +143,10 @@ var createUserMutation = mutationWithClientMutationId({
   outputFields: {
     api: { 
       type: apiType,
-      resolve: ({authToken, userId}) => {
+      resolve: ({authToken, userId, authError}) => {
         var api = Api.get();
         api.authToken = authToken;
+        api.authError = authError;
         return api;
       }
     }
@@ -146,10 +159,19 @@ var createUserMutation = mutationWithClientMutationId({
 
     return new Promise((resolve, reject) => {
       User.create(createUserDB).then(
-        user => {
-          var userId = user.id;
-          var authToken = signToken({userId});
-          resolve({ authToken, userId });
+        ({user, error}) => {
+          var userId = null;
+          var authToken = null;
+          var authError = null;
+
+          if (error && error.code === 'ER_DUP_ENTRY') {
+            authError = 'USER_ALREADY_EXISTS';
+          } else {
+            userId = user.id;
+            authToken = signToken({userId});
+          }
+
+          resolve({ authToken, userId, authError });
         }
       ).catch(
         reason => reject(reason)
@@ -182,9 +204,10 @@ var loginMutation = mutationWithClientMutationId({
   outputFields: {
     api: { 
       type: apiType,
-      resolve: ({authToken, userId}) => {
+      resolve: ({authToken, userId, authError}) => {
         var api = Api.get();
         api.authToken = authToken;
+        api.authError = authError;
         return api;
       }
     }
@@ -195,13 +218,18 @@ var loginMutation = mutationWithClientMutationId({
         ({user, password}) => {
           var authToken = null;
           var userId = null;
+          var authError = null;
 
-          if (hashPassword(login.password) === password) {
+          if (!user) {
+            authError = 'INVALID_CREDENTIALS';
+          } else if (hashPassword(login.password) !== password) {
+            authError = 'INVALID_CREDENTIALS';
+          } else {
             userId = user.id;
             authToken = signToken({userId});
           }
 
-          resolve({ authToken, userId });
+          resolve({authToken, userId, authError});
         }
       ).catch(
         reason => reject(reason)

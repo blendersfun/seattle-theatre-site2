@@ -16,6 +16,7 @@ class CreateAccountMutation extends Relay.Mutation {
       fragment on CreateUserPayload {
         api {
           authToken,
+          authError,
           user
         }
       }
@@ -43,6 +44,7 @@ class LoginMutation extends Relay.Mutation {
       fragment on LoginPayload {
         api {
           authToken,
+          authError,
           user
         }
       }
@@ -59,6 +61,10 @@ class LoginMutation extends Relay.Mutation {
 }
 
 class App extends React.Component {
+  state = {
+    authError: null
+  };
+
   render() {
     return (
       <div>
@@ -66,14 +72,26 @@ class App extends React.Component {
         <form ref="a_form">
           Email: <input ref="a_email"/> <br/>
           Password: <input type="password" ref="a_password"/> <br/>
-          <input type="submit" value="Create" onClick={this.createAccount}/> <br/>
+          <input type="submit" value="Create" onClick={this.createAccount}/>  {' '}
+          {this.state.authError ? 
+            <span className="errorMessage">
+              {this.state.authError === 'USER_ALREADY_EXISTS' ? 'This email address is already associated with an existing user account.' : ''}
+            </span> 
+            : ''}
+          <br/>
         </form>
 
         <h2>Login</h2>
         <form ref="L_form">
           Email: <input ref="L_email"/> <br/>
           Password: <input type="password" ref="L_password"/> <br/>
-          <input type="submit" value="Login" onClick={this.login}/> <br/><br/>
+          <input type="submit" value="Login" onClick={this.login}/> {' '}
+          {this.state.authError ? 
+            <span className="errorMessage">
+              {this.state.authError === 'INVALID_CREDENTIALS' ? 'Email or password were incorrect.' : ''}
+            </span> 
+            : ''}
+          <br/><br/>
         </form>
 
         {this.props.api.user ? 
@@ -89,7 +107,8 @@ class App extends React.Component {
 
   createAccount = (e) => {
     e.preventDefault();
-    
+    this.setState({authError: null});
+
     var createUser = {};
     createUser.email = this.refs.a_email.value;
     createUser.password = this.refs.a_password.value;
@@ -102,8 +121,14 @@ class App extends React.Component {
     Relay.Store.update(mutation, {
       onSuccess: result => {
         var authToken = result.createUser.api.authToken;
-        document.cookie = cookie.serialize("seathe_authToken", authToken, { maxAge: 24 * 60 * 60 });
-        this.refs.a_form.reset();
+        var authError = result.createUser.api.authError;
+
+        if (authToken) {
+          this._setCookie("seathe_authToken", authToken);
+          this.refs.a_form.reset();
+        } else if (authError) {
+          this.setState({authError});
+        }
       },
       onFailure: () => console.log('account create failure')
     });
@@ -111,6 +136,7 @@ class App extends React.Component {
 
   login = (e) => {
     e.preventDefault();
+    this.setState({authError: null});
 
     var login = {};
     login.email = this.refs.L_email.value;
@@ -124,16 +150,29 @@ class App extends React.Component {
     Relay.Store.update(mutation, {
       onSuccess: result => {
         var authToken = result.login.api.authToken;
-        document.cookie = cookie.serialize("seathe_authToken", authToken, { maxAge: 24 * 60 * 60 });
-        this.refs.L_form.reset();
+        var authError = result.login.api.authError;
+
+        if (authToken) {
+          this._setCookie("seathe_authToken", authToken);
+          this.refs.L_form.reset();
+        } else if (authError) {
+          this.setState({authError});
+        }
       },
       onFailure: () => console.log('login failure')
     });
   }
 
   logout = () => {
-    document.cookie = cookie.serialize("seathe_authToken", "", { maxAge: -1 });
+    this._deleteCookie("seathe_authToken");
     this.props.relay.forceFetch({ authToken: null });
+  }
+
+  _setCookie = (name, value) => {
+    document.cookie = cookie.serialize(name, value, { maxAge: 24 * 60 * 60 });
+  }
+  _deleteCookie = (name) => {
+    document.cookie = cookie.serialize("seathe_authToken", "", { maxAge: -1 })
   }
 }
 
@@ -146,6 +185,7 @@ export default Relay.createContainer(App, {
       fragment on Api {
         id,
         authToken,
+        authError,
         user(authToken: $authToken) {
           id,
           email

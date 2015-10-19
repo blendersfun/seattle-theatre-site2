@@ -83,7 +83,7 @@ class User {
               var password = results[0].password;
               resolve({user, password});
             } else {
-              resolve(null);
+              resolve({});
             }
           }
           connection.destroy();
@@ -100,7 +100,11 @@ class User {
       var connection = getMysqlConnection();
       connection.query(insertQuery, [email, password], (insertErr, insertResult) => {
         if (insertErr) {
-          reject(insertErr);
+          if (insertErr.code === 'ER_DUP_ENTRY') {
+            resolve({error: insertErr});
+          } else {
+            reject(insertErr);
+          }
           connection.destroy();
         } else {
           var id = insertResult.insertId;
@@ -109,7 +113,7 @@ class User {
               reject(selectErr);
             } else {
               var user = User._userRecordToObject(selectResults[0]);
-              resolve(user);
+              resolve({user});
             }
             connection.destroy();
           });
