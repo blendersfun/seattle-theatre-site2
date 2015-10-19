@@ -6,11 +6,11 @@ window.Relay = Relay;
 
 export default class extends Relay.Route {
   static queries = {
-    root: () => Relay.QL`
+    api: () => Relay.QL`
       query {
-        root
+        api
       }
     `,
   };
-  static routeName = 'AppHomeRoute';
+  static routeName = 'AppRoute';
 }

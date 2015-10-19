@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Relay from 'react-relay';
+import cookie from 'cookie';
 
 class CreateAccountMutation extends Relay.Mutation {
   getMutation() {
@@ -13,8 +14,7 @@ class CreateAccountMutation extends Relay.Mutation {
   getFatQuery() {
     return Relay.QL`
       fragment on CreateUserPayload {
-        root {
-          id,
+        api {
           authToken,
           user
         }
@@ -25,7 +25,34 @@ class CreateAccountMutation extends Relay.Mutation {
     return [{
       type: 'FIELDS_CHANGE',
       fieldIDs: {
-        root: this.props.rootId
+        api: this.props.apiId
+      },
+    }];
+  }
+}
+
+class LoginMutation extends Relay.Mutation {
+  getMutation() {
+    return Relay.QL`mutation {login}`;
+  }
+  getVariables() {
+    return {login: this.props.login};
+  }
+  getFatQuery() {
+    return Relay.QL`
+      fragment on LoginPayload {
+        api {
+          authToken,
+          user
+        }
+      }
+    `;
+  }
+  getConfigs() {
+    return [{
+      type: 'FIELDS_CHANGE',
+      fieldIDs: {
+        api: this.props.apiId
       },
     }];
   }
@@ -35,52 +62,93 @@ class App extends React.Component {
   render() {
     return (
       <div>
-        <h1>Create Account</h1>
-        Full name: {' '}
-          <input placeholder="First" ref="first"/>{' '}
-          <input placeholder="Middle (optional)" ref="middle"/>{' '}
-          <input placeholder="Last" ref="last"/> <br/>
-        Email: <input ref="email"/> <br/>
-        Phone: <input placeholder="(optional)" ref="phone"/> <br/>
-        Password: <input type="password" ref="password"/> <br/>
-        <input type="submit" value="Go" onClick={this.createAccount}/>
+        <h2>Create Account</h2>
+        <form ref="a_form">
+          Email: <input ref="a_email"/> <br/>
+          Password: <input type="password" ref="a_password"/> <br/>
+          <input type="submit" value="Create" onClick={this.createAccount}/> <br/>
+        </form>
+
+        <h2>Login</h2>
+        <form ref="L_form">
+          Email: <input ref="L_email"/> <br/>
+          Password: <input type="password" ref="L_password"/> <br/>
+          <input type="submit" value="Login" onClick={this.login}/> <br/><br/>
+        </form>
+
+        {this.props.api.user ? 
+          <div>
+            Logged in as: {this.props.api.user.email}{' '}
+            <input type="submit" value="Logout" onClick={this.logout}/>
+          </div>
+          : 'Not logged in.'
+        } <br/><br/>
       </div>
     );
   }
-  createAccount = () => {
+
+  createAccount = (e) => {
+    e.preventDefault();
+    
     var createUser = {};
-    createUser.firstName = this.refs.first.value;
-    createUser.middleName = this.refs.middle.value;
-    createUser.lastName = this.refs.last.value;
-    createUser.email = this.refs.email.value;
-    createUser.phone = this.refs.phone.value;
-    createUser.password = this.refs.password.value;
-    if (!createUser.middleName) {
-      createUser.middleName = null;
-    }
-    if (!createUser.phone) {
-      createUser.phone = null;
-    }
-    Relay.Store.update(new CreateAccountMutation({
-      rootId: this.props.root.id, 
+    createUser.email = this.refs.a_email.value;
+    createUser.password = this.refs.a_password.value;
+
+    var mutation = new CreateAccountMutation({
+      apiId: this.props.api.id, 
       createUser: createUser
-    }));
-    setTimeout(() => { console.log(this.props)}, 1000);
+    });
+
+    Relay.Store.update(mutation, {
+      onSuccess: result => {
+        var authToken = result.createUser.api.authToken;
+        document.cookie = cookie.serialize("seathe_authToken", authToken, { maxAge: 24 * 60 * 60 });
+        this.refs.a_form.reset();
+      },
+      onFailure: () => console.log('account create failure')
+    });
+  }
+
+  login = (e) => {
+    e.preventDefault();
+
+    var login = {};
+    login.email = this.refs.L_email.value;
+    login.password = this.refs.L_password.value;
+
+    var mutation = new LoginMutation({
+      apiId: this.props.api.id, 
+      login: login
+    });
+
+    Relay.Store.update(mutation, {
+      onSuccess: result => {
+        var authToken = result.login.api.authToken;
+        document.cookie = cookie.serialize("seathe_authToken", authToken, { maxAge: 24 * 60 * 60 });
+        this.refs.L_form.reset();
+      },
+      onFailure: () => console.log('login failure')
+    });
+  }
+
+  logout = () => {
+    document.cookie = cookie.serialize("seathe_authToken", "", { maxAge: -1 });
+    this.props.relay.forceFetch({ authToken: null });
   }
 }
 
 export default Relay.createContainer(App, {
+  initialVariables: {
+    authToken: cookie.parse(document.cookie).seathe_authToken || null
+  },
   fragments: {
-    root: () => Relay.QL`
-      fragment on Root {
+    api: () => Relay.QL`
+      fragment on Api {
         id,
         authToken,
-        user {
+        user(authToken: $authToken) {
+          id,
           email
-          person {
-            firstName
-            lastName
-          }
         }
       }
     `,

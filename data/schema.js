@@ -23,39 +23,30 @@ import {
   nodeDefinitions,
 } from 'graphql-relay';
 
-import db from './database';
-import config from "../config/config.json";
-import jwt from "jsonwebtoken";
+import {
+  Api,
+  User,
+} from './database';
 
-/**
- * We get the node interface and field from the Relay library.
- *
- * The first method defines the way we resolve an ID to its object.
- * The second defines the way we resolve an object to its GraphQL type.
- */
+import config from '../config/config.json';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+
 var {nodeInterface, nodeField} = nodeDefinitions(
   (globalId) => {
     var {type, id} = fromGlobalId(globalId);
-    if (type === 'Root') {
-      return db.getRoot(id);
-    } else if (type === 'ProducingOrg') {
-      return db.getProducingOrg(id);
-    } else if (type === 'Person') {
-      return db.getPerson(id);
+    if (type === 'Api') {
+      return Api.get();
     } else if (type === 'User') {
-      return db.getUser(id);
+      return User.getById(id);
     } else {
       return null;
     }
   },
   (obj) => {
-    if (obj instanceof db.Root) {
-      return rootType;
-    } else if (obj instanceof db.ProducingOrg) {
-      return producingOrgType;
-    } else if (obj instanceof db.Person) {
-      return personType;
-    } else if (obj instanceof db.User) {
+    if (obj instanceof Api) {
+      return apiType;
+    } else if (obj instanceof User) {
       return userType;
     } else {
       return null;
@@ -64,56 +55,32 @@ var {nodeInterface, nodeField} = nodeDefinitions(
 );
 
 /**
- * Define your own types here
+ * Seattle-theatre API:
  */
 
-var fooType = new GraphQLObjectType({
-  name: 'Foo',
-  description: 'A foo.',
+var apiType = new GraphQLObjectType({
+  name: 'Api',
+  description: 'The seattle-theatre server api.',
   fields: () => ({
-    id: globalIdField('Foo'),
-    name: {
-      type: new GraphQLNonNull(GraphQLString),
-      description: 'The name of the foo.',
-    }
-  }),
-  interfaces: [nodeInterface],
-});
-
-var rootType = new GraphQLObjectType({
-  name: 'Root',
-  description: 'The root object in the seattle-theatre schema.',
-  fields: () => ({
-    id: globalIdField('Root'),
-    authToken: {
-      type: GraphQLString,
-      description: 'The user authentication token, if the user has logged in.'
-    },
-    producingOrgs: {
-      type: producingOrgConnection,
-      description: 'All producing organizations in the system.',
-      args: connectionArgs,
-      resolve: (_, args) => 
-        new Promise((resolve, reject) => {
-          db.getProducingOrgs().then(
-            result => resolve(connectionFromArray(result, args))
-          ).catch(
-            rejectReason => reject('Producing orgs could not be retrieved because: ' + rejectReason)
-          );
-        }),
-    },
-    foo: {
-      type: fooType,
-      resolve: () => db.getFoo()
-    },
+    id: globalIdField('Api'),
+    authToken: { type: GraphQLString },
     user: {
       type: userType,
-      resolve: ({authToken}) => {
+      args: {
+        authToken: { type: GraphQLString }
+      },
+      resolve: (api, args) => {
+
+        // Gets an auth token either as a client argument or from 
+        // off the Api type (used when login status has not
+        // yet propagated to the client).
+        var authToken = args.authToken || api.authToken || false;
+
         if (authToken) {
           return new Promise((resolve, reject) => {
             var decoded = jwt.verify(authToken, config.auth.secret);
-            db.getUser(decoded.userId).then(
-              user => { resolve(user); }
+            User.getById(decoded.userId).then(
+              user => resolve(user)
             ).catch(
               reason => reject(reason)
             );
@@ -127,45 +94,6 @@ var rootType = new GraphQLObjectType({
   interfaces: [nodeInterface],
 });
 
-var producingOrgType = new GraphQLObjectType({
-  name: 'ProducingOrg',
-  description: 'An organization that produces theatrical events.',
-  fields: () => ({
-    id: globalIdField('ProducingOrg'),
-    name: {
-      type: new GraphQLNonNull(GraphQLString),
-      description: 'The name of the organization.',
-    },
-    missionStatement: {
-      type: GraphQLString,
-      description: 'The mission statement describing the organization\'s goals, artistic or otherwise.',
-    },
-  }),
-  interfaces: [nodeInterface],
-});
-var {connectionType: producingOrgConnection} =
-  connectionDefinitions({name: 'ProducingOrg', nodeType: producingOrgType});
-
-/**
- * User Types
- */
-
-var userInProgressType = new GraphQLObjectType({
-  name: 'UserInProgress',
-  description: 'A container which houses a user and a person record' + 
-               ' that already exists that should potentially be linked to it. ' +
-               ' Note: this type cannot be refetched.',
-  fields: () => ({
-    user: {
-      type: new GraphQLNonNull(userType),
-      description: 'The user being created.'
-    },
-    personMatch: {
-      type: new GraphQLNonNull(personType),
-      description: 'The person that is a potential match.'
-    }
-  })
-});
 var userType = new GraphQLObjectType({
   name: 'User',
   description: 'A user of the system.',
@@ -174,117 +102,140 @@ var userType = new GraphQLObjectType({
     email: {
       type: new GraphQLNonNull(GraphQLString),
       description: 'The user\'s email address.'
-    },
-    phone: {
-      type: GraphQLString,
-      description: 'The user\'s phone number.'
-    },
-    person: {
-      type: personType,
-      description: 'The person information describing the owner of this account.'
     }
   }),
   interfaces: [nodeInterface],
 });
-var personType = new GraphQLObjectType({
-  name: 'Person',
-  description: 'A person who may or may not user the system, but nevertheless needs to be referred to.',
-  fields: () => ({
-    id: globalIdField('Person'),
-    firstName: {
-      type: new GraphQLNonNull(GraphQLString),
-      description: 'The person\'s first name.'
-    },
-    middleName: {
-      type: GraphQLString,
-      description: 'The person\'s middle name.'
-    },
-    lastName: {
-      type: new GraphQLNonNull(GraphQLString),
-      description: 'The person\'s last name.'
-    },
-    inActorsEquity: {
-      type: GraphQLBoolean,
-      description: 'Marks whether this person is a member of Actors\' Equity Association.'
-    },
-    user: {
-      type: userType,
-      description: 'The user information for this person, if this person has an account.'
-    }
-  })
-});
 
-var createUserType = new GraphQLInputObjectType({
+/*
+ * Mutation: CreateUser
+ *  Creates a user account and then returns an authToken (so that
+ *  the user will now be logged in).
+ */
+
+var createUserInputType = new GraphQLInputObjectType({
   name: 'CreateUser',
-  description: 'The input type for the CreateUserMutation.',
+  description: 'The input type for the CreateUser mutation.',
   fields: () => ({
-    firstName: { type: new GraphQLNonNull(GraphQLString) },
-    middleName: { type: GraphQLString },
-    lastName: { type: new GraphQLNonNull(GraphQLString) },
     email: { type: new GraphQLNonNull(GraphQLString) },
-    password: { type: new GraphQLNonNull(GraphQLString) },
-    phone: { type: GraphQLString }
+    password: { type: new GraphQLNonNull(GraphQLString) }
   })
 });
 
 var createUserMutation = mutationWithClientMutationId({
   name: 'CreateUser',
+  description: 'A mutation which creates a user account and logs the user into it.',
   inputFields: {
-    createUser: { type: createUserType },
+    createUser: { type: createUserInputType },
   },
   outputFields: {
-    root: { 
-      type: rootType,
-      resolve: ({authToken}) => {
-        var root = db.getRoot();
-        root.authToken = authToken;
-        return root;
+    api: { 
+      type: apiType,
+      resolve: ({authToken, userId}) => {
+        var api = Api.get();
+        api.authToken = authToken;
+        return api;
       }
     }
   },
   mutateAndGetPayload: ({createUser}) => {
+    var createUserDB = {
+      email: createUser.email,
+      password: hashPassword(createUser.password)
+    };
+
     return new Promise((resolve, reject) => {
-      var user = db.createUser(createUser);
-      user.then(user => {
-        var authToken = jwt.sign({ userId: user.id }, config.auth.secret, { expiresIn: "24h" });
-        resolve({ authToken, user });
-      }).catch(reason => {
-        reject('Problem in mutateAndGetPayload: ' + reason)
-      });
+      User.create(createUserDB).then(
+        user => {
+          var userId = user.id;
+          var authToken = signToken({userId});
+          resolve({ authToken, userId });
+        }
+      ).catch(
+        reason => reject(reason)
+      );
     });
   },
 });
 
-/**
- * This is the type that will be the root of our query,
- * and the entry point into our schema.
+/*
+ * Mutation: Login
+ *  Looks up the user account and verifies the authentication
+ *  information is correct then signs and sends back an authToken.
  */
+
+var loginInputType = new GraphQLInputObjectType({
+  name: 'Login',
+  description: 'The input type for the Login mutation.',
+  fields: () => ({
+    email: { type: new GraphQLNonNull(GraphQLString) },
+    password: { type: new GraphQLNonNull(GraphQLString) }
+  })
+});
+
+var loginMutation = mutationWithClientMutationId({
+  name: 'Login',
+  description: 'A mutation for logging in.',
+  inputFields: {
+    login: { type: loginInputType },
+  },
+  outputFields: {
+    api: { 
+      type: apiType,
+      resolve: ({authToken, userId}) => {
+        var api = Api.get();
+        api.authToken = authToken;
+        return api;
+      }
+    }
+  },
+  mutateAndGetPayload: ({login}) => {
+    return new Promise((resolve, reject) => {
+      User.getUserAndPasswordByEmail(login.email).then(
+        ({user, password}) => {
+          var authToken = null;
+          var userId = null;
+
+          if (hashPassword(login.password) === password) {
+            userId = user.id;
+            authToken = signToken({userId});
+          }
+
+          resolve({ authToken, userId });
+        }
+      ).catch(
+        reason => reject(reason)
+      );
+    });
+  },
+});
+
+function hashPassword(plainPassword) {
+  return crypto.createHash('sha512').update(plainPassword).digest('base64')
+}
+function signToken(payload) {
+  return jwt.sign(payload, config.auth.secret, { expiresIn: "24h" });
+}
+
 var queryType = new GraphQLObjectType({
   name: 'Query',
   fields: () => ({
     node: nodeField,
-    root: {
-      type: rootType,
-      resolve: () => db.getRoot(),
+    api: {
+      type: apiType,
+      resolve: () => Api.get(),
     },
   }),
 });
 
-/**
- * This is the type that will be the root of our mutations,
- * and the entry point into performing writes in our schema.
- */
 var mutationType = new GraphQLObjectType({
   name: 'Mutation',
   fields: () => ({
-    createUser: createUserMutation
+    createUser: createUserMutation,
+    login: loginMutation
   })
 });
 
-/**
- * Finally, we construct our schema (whose starting query type is the query
- * type we defined above) and export it.
- */
 export var Schema = new GraphQLSchema({
   query: queryType,
   mutation: mutationType
