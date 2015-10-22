@@ -67,6 +67,7 @@ var apiType = new GraphQLObjectType({
     id: globalIdField('Api'),
     authError: { type: authErrorType },
     authToken: { type: GraphQLString },
+    blag: { type: GraphQLString },
     user: {
       type: userType,
       args: {
@@ -251,7 +252,11 @@ var queryType = new GraphQLObjectType({
     node: nodeField,
     api: {
       type: apiType,
-      resolve: () => Api.get(),
+      resolve: () => {
+        var api = Api.get();
+        api.blag = 'foooooo!';
+        return api;
+      },
     },
   }),
 });

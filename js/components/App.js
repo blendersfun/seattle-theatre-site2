@@ -3,6 +3,8 @@
 import React from 'react';
 import Relay from 'react-relay';
 import cookie from 'cookie';
+import {Link} from 'react-router';
+require("!style!raw!less!./style.less");
 
 class CreateAccountMutation extends Relay.Mutation {
   getMutation() {
@@ -99,8 +101,10 @@ class App extends React.Component {
             Logged in as: {this.props.api.user.email}{' '}
             <input type="submit" value="Logout" onClick={this.logout}/>
           </div>
-          : 'Not logged in.'
-        } <br/><br/>
+          : <span>Not logged in. <br/></span>
+        } <br/>
+
+        <Link to="/other">Go to other</Link>
       </div>
     );
   }
