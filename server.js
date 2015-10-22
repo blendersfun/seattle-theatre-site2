@@ -3,7 +3,7 @@ import graphQLHTTP from 'express-graphql';
 import path from 'path';
 import webpack from 'webpack';
 import WebpackDevServer from 'webpack-dev-server';
-import {Schema} from './data/schema';
+import {Schema} from './app-server/schema';
 
 const APP_PORT = 3000;
 const GRAPHQL_PORT = 8081;
@@ -17,7 +17,7 @@ graphQLServer.listen(GRAPHQL_PORT, () => console.log(
 
 // Serve the Relay app
 var compiler = webpack({
-  entry: path.resolve(__dirname, 'js', 'app.js'),
+  entry: path.resolve(__dirname, 'app-client', 'app.js'),
   module: {
     loaders: [
       {
@@ -38,7 +38,7 @@ var compiler = webpack({
 var app = new WebpackDevServer(compiler, {
   contentBase: '/public/',
   proxy: {'/graphql': `http://localhost:${GRAPHQL_PORT}`},
-  publicPath: '/js/',
+  publicPath: '/app-client/',
   stats: {colors: true}
 });
 // Serve static resources

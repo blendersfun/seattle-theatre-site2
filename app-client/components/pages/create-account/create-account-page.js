@@ -4,7 +4,6 @@ import React from 'react';
 import Relay from 'react-relay';
 import cookie from 'cookie';
 import {Link} from 'react-router';
-require("!style!raw!less!./style.less");
 
 class CreateAccountMutation extends Relay.Mutation {
   getMutation() {
@@ -69,7 +68,7 @@ class App extends React.Component {
 
   render() {
     return (
-      <div>
+      <div id="createAccountPage">
         <h2>Create Account</h2>
         <form ref="a_form">
           Email: <input ref="a_email"/> <br/>
@@ -104,7 +103,7 @@ class App extends React.Component {
           : <span>Not logged in. <br/></span>
         } <br/>
 
-        <Link to="/other">Go to other</Link>
+        <Link to="/">Go to home page</Link>
       </div>
     );
   }
