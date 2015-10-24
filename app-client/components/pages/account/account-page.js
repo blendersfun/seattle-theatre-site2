@@ -6,22 +6,22 @@ import {Link} from 'react-router';
 
 import BasePage from '../../shared/base-page';
 
-class HomePage extends React.Component {
+class AccountPage extends React.Component {
   state = {
     authError: null
   };
 
   render() {
     return (
-      <div id="homePage">
-        <h2>Home page</h2>
-        I am the home page. <br/><br/>
+      <div id="accountPage">
+        <h2>Account page</h2>
+        I am the account page. <br/><br/>
       </div>
     );
   }
 }
 
-var Home = Relay.createContainer(HomePage, {
+var Account = Relay.createContainer(AccountPage, {
   fragments: {
     api: () => Relay.QL`
       fragment on Api {
@@ -36,4 +36,4 @@ var Home = Relay.createContainer(HomePage, {
   },
 });
 
-export default BasePage(Home);
+export default BasePage(Account);

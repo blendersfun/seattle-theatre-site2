@@ -1,2 +1,2 @@
-import page from './home-page';
-export default page;
+import component from './home-page';
+export default component;

@@ -28,6 +28,7 @@ import {
 import {
   Api,
   User,
+  ProducingOrg,
 } from './database';
 
 import config from '../config/config.json';
@@ -67,18 +68,13 @@ var apiType = new GraphQLObjectType({
     id: globalIdField('Api'),
     authError: { type: authErrorType },
     authToken: { type: GraphQLString },
-    blag: { type: GraphQLString },
     user: {
       type: userType,
       args: {
         authToken: { type: GraphQLString }
       },
       resolve: (api, args) => {
-
-        // Gets an auth token either as a client argument or from 
-        // off the Api type (used when login status has not
-        // yet propagated to the client).
-        var authToken = args.authToken || api.authToken || false;
+        var authToken = args.authToken;
 
         if (authToken) {
           return new Promise((resolve, reject) => {
@@ -93,10 +89,15 @@ var apiType = new GraphQLObjectType({
           return null;
         }
       }
-    }
+    },
+    producingOrgError: { type: producingOrgErrorType },
   }),
   interfaces: [nodeInterface],
 });
+
+/* 
+ * User Schema
+ */
 
 var userType = new GraphQLObjectType({
   name: 'User',
@@ -106,6 +107,27 @@ var userType = new GraphQLObjectType({
     email: {
       type: new GraphQLNonNull(GraphQLString),
       description: 'The user\'s email address.'
+    },
+    accessLevel: {
+      type: new GraphQLNonNull(GraphQLString),
+      description: 'The user\'s permissions information.'
+    },
+    orgAdminFor: {
+      type: producingOrgType,
+      description: 'The producing organization this user administers.',
+      resolve: ({id, accessLevel}) => {
+        if (accessLevel === 'ORG_ADMIN') {
+          return new Promise((resolve, reject) => {
+            ProducingOrg.getByOrgAdminUserId(id).then(
+              org => resolve(org)
+            ).catch(
+              reason => reject(reason)
+            );
+          });
+        } else {
+          return null;
+        }
+      }
     }
   }),
   interfaces: [nodeInterface],
@@ -161,7 +183,7 @@ var createUserMutation = mutationWithClientMutationId({
     return new Promise((resolve, reject) => {
       User.create(createUserDB).then(
         ({user, error}) => {
-          var userId = null;
+          var userId = null, accessLevel = null;
           var authToken = null;
           var authError = null;
 
@@ -169,7 +191,8 @@ var createUserMutation = mutationWithClientMutationId({
             authError = 'USER_ALREADY_EXISTS';
           } else {
             userId = user.id;
-            authToken = signToken({userId});
+            accessLevel = user.accessLevel;
+            authToken = signToken({userId, accessLevel});
           }
 
           resolve({ authToken, userId, authError });
@@ -218,7 +241,7 @@ var loginMutation = mutationWithClientMutationId({
       User.getUserAndPasswordByEmail(login.email).then(
         ({user, password}) => {
           var authToken = null;
-          var userId = null;
+          var userId = null, accessLevel = null;
           var authError = null;
 
           if (!user) {
@@ -227,7 +250,8 @@ var loginMutation = mutationWithClientMutationId({
             authError = 'INVALID_CREDENTIALS';
           } else {
             userId = user.id;
-            authToken = signToken({userId});
+            accessLevel = user.accessLevel;
+            authToken = signToken({userId, accessLevel});
           }
 
           resolve({authToken, userId, authError});
@@ -246,15 +270,118 @@ function signToken(payload) {
   return jwt.sign(payload, config.auth.secret, { expiresIn: "24h" });
 }
 
+/* 
+ * Producing Org Schema
+ */
+
+var producingOrgErrorType = new GraphQLEnumType({
+  name: 'ProducingOrgError',
+  description: 'Error codes for producing org operations.',
+  values: {
+    PRODUCING_ORG_ALREADY_EXISTS: {}
+  }
+});
+
+var producingOrgType = new GraphQLObjectType({
+  name: 'ProducingOrg',
+  description: 'An organization that produces theatre.',
+  fields: () => ({
+    id: globalIdField('ProducingOrg'),
+    name: {
+      type: new GraphQLNonNull(GraphQLString),
+      description: 'The organization\'s name'
+    },
+    missionStatement: {
+      type: GraphQLString,
+      description: 'The organization\'s mission statement.'
+    }
+  }),
+  interfaces: [nodeInterface],
+});
+
+/*
+ * Mutation: CreateUser
+ *  Creates a user account and then returns an authToken (so that
+ *  the user will now be logged in).
+ */
+
+var createProducingOrgInputType = new GraphQLInputObjectType({
+  name: 'CreateProducingOrg',
+  description: 'The input type for the CreateProducingOrg mutation.',
+  fields: () => ({
+    name: { type: new GraphQLNonNull(GraphQLString) },
+    missionStatement: { type: GraphQLString },
+    userId: { type: new GraphQLNonNull(GraphQLID) },
+  })
+});
+
+var createProducingOrgMutation = mutationWithClientMutationId({
+  name: 'CreateProducingOrg',
+  description: 'A mutation which creates a producing organization and ' +
+               'modifies the user permissions for the user who created it ' +
+               'so that they have administrative access to it.',
+  inputFields: {
+    createProducingOrg: { type: createProducingOrgInputType },
+  },
+  outputFields: {
+    api: { 
+      type: apiType,
+      resolve: ({authToken, producingOrgError}) => {
+        var api = Api.get();
+        api.authToken = authToken;
+        api.producingOrgError = producingOrgError;
+        return api;
+      }
+    }
+  },
+  mutateAndGetPayload: ({createProducingOrg}) => {
+    var {type, id} = fromGlobalId(createProducingOrg.userId);
+    createProducingOrg.userId = id;
+
+    return new Promise((resolve, reject) => {
+      ProducingOrg.create(createProducingOrg).then(
+        ({producingOrg, user, error}) => {
+          var authToken = null;
+          var userId = null, accessLevel = null;
+          var producingOrgError = null;
+
+          if (error) {
+            if (error.code === 'ER_DUP_ENTRY') {
+              producingOrgError = 'PRODUCING_ORG_ALREADY_EXISTS';
+              resolve({producingOrgError});
+            } else {
+              reject(error);
+            }
+          } else {
+            if (user) {
+              userId = user.id;
+              accessLevel = user.accessLevel;
+              authToken = signToken({userId, accessLevel});
+            } else {
+              console.warn("Updated user record missing during createOrg mutate.");
+            }
+          }
+
+          resolve({authToken, userId});
+        }
+      ).catch(
+        reason => reject(reason)
+      );
+    });
+  },
+});
+
 var queryType = new GraphQLObjectType({
   name: 'Query',
   fields: () => ({
     node: nodeField,
     api: {
       type: apiType,
+      args: {
+        authToken: { type: GraphQLString }
+      },
       resolve: () => {
         var api = Api.get();
-        api.blag = 'foooooo!';
         return api;
       },
     },
@@ -265,11 +392,12 @@ var mutationType = new GraphQLObjectType({
   name: 'Mutation',
   fields: () => ({
     createUser: createUserMutation,
-    login: loginMutation
+    login: loginMutation,
+    createProducingOrg: createProducingOrgMutation,
   })
 });
 
 export var Schema = new GraphQLSchema({
   query: queryType,
-  mutation: mutationType
+  mutation: mutationType,
 });

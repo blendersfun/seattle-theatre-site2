@@ -1,2 +1,2 @@
-import page from './create-account-page';
-export default page;
+import component from './create-account-page';
+export default component;
