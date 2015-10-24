@@ -5,6 +5,7 @@ import Relay from 'react-relay';
 import {Link} from 'react-router';
 
 import BasePage from '../../shared/base-page';
+import history from '../../../history';
 
 class AccountPage extends React.Component {
   state = {
@@ -12,6 +13,8 @@ class AccountPage extends React.Component {
   };
 
   render() {
+    if (!this.accessAllowed()) return null;
+
     return (
       <div id="accountPage">
         <h2>Account page</h2>
@@ -19,6 +22,17 @@ class AccountPage extends React.Component {
       </div>
     );
   }
+  accessAllowed = (props) => {
+    props = props || this.props;
+    return props.user;
+  }
+  redirectIfImproperAccess = (props) => {
+    if (!this.accessAllowed(props)) {
+      setTimeout(() => history.pushState({}, '/'), 10);
+    }
+  }
+  componentWillMount = () => this.redirectIfImproperAccess()
+  componentWillUpdate = (props) => this.redirectIfImproperAccess(props)
 }
 
 var Account = Relay.createContainer(AccountPage, {

@@ -8,12 +8,15 @@ import CreateProducingOrgMutation from './create-org-mutation';
 
 import BasePage from '../../shared/base-page';
 import cookie from '../../shared/cookie-manager';
+import history from '../../../history';
 
 class CreateOrgPage extends React.Component {
   state = {
     producingOrgError: null
   };
   render() {
+    if (!this.accessAllowed()) return null;
+
     return (
       <div id="createOrgPage">
         <h2>Create org page</h2>
@@ -65,6 +68,17 @@ class CreateOrgPage extends React.Component {
       onFailure: () => console.log('org create failure')
     });
   }
+  accessAllowed = (props) => {
+    props = props || this.props;
+    return props.user && ['PARTICIPANT','SYS_ADMIN'].includes(props.user.accessLevel)
+  }
+  redirectIfImproperAccess = (props) => {
+    if (!this.accessAllowed(props)) {
+      setTimeout(() => history.pushState({}, '/'), 10);
+    }
+  }
+  componentWillMount = () => this.redirectIfImproperAccess()
+  componentWillUpdate = (props) => this.redirectIfImproperAccess(props)
 }
 
 var CreateOrg = Relay.createContainer(CreateOrgPage, {
@@ -77,7 +91,8 @@ var CreateOrg = Relay.createContainer(CreateOrgPage, {
     `,
     user: () => Relay.QL`
       fragment on User {
-        id
+        id,
+        accessLevel,
       }
     `,
   },

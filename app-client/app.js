@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom';
 import Relay from 'react-relay';
 import {Router, Route} from 'react-router';
 import ReactRouterRelay from 'react-router-relay';
-import {createHistory} from 'history';
+import history from './history';
 
 require("!style!raw!less!./style.less");
 
@@ -27,7 +27,7 @@ var ApiQueries = {
 
 ReactDOM.render(
   <Router 
-    history={createHistory()}
+    history={history}
     createElement={ReactRouterRelay.createElement}>
     
     <Route path="/" 
