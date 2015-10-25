@@ -14,6 +14,7 @@ import CreateAccount from './components/pages/create-account';
 import Account from './components/pages/account';
 import CreateOrg from './components/pages/create-org';
 import OrgAdmin from './components/pages/org-admin';
+import AddProduction from './components/pages/org-admin/add-production';
 
 var ApiQueries = {
   api: (Component) => Relay.QL`
@@ -48,6 +49,10 @@ ReactDOM.render(
 
     <Route path="/org-admin" 
       component={OrgAdmin} 
+      queries={ApiQueries}/>
+
+    <Route path="/org-admin/add-production" 
+      component={AddProduction} 
       queries={ApiQueries}/>
   </Router>,
   document.getElementById('root')

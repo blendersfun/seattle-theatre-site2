@@ -144,6 +144,14 @@ class User {
   }
 }
 
+
+
+
+
+/*
+ * Producing Organizations
+ */
+
 class ProducingOrg {
   static getById(id) {
     return new Promise((resolve, reject) => {
@@ -275,8 +283,280 @@ class ProducingOrg {
   }
 }
 
+
+
+
+
+
+
+/*
+ * Productions
+ *  The production model is somewhat complex for the sake of supporting
+ *  a variety of use cases. Examples of use cases:
+ *    1. (simplest, most common:) Strawberry Theatre Workshop produces Our Town
+ *    2. Freehold Theatre produces a solo performance festival comprising 11 short pieces
+ *    3. Unexpected Productions produces a long-form improvised play in the style of Clive Barker
+ *    4. Spectrum Dance Theatre produces 'Love', a dance piece which meditates on the complexities of human intimacy
+ *  In other words:
+ *    1. A show may or may not have a script.
+ *    2. A show may comprise a single staging (scripted or unscripted) or be a collection of pieces.
+ *
+ *  The design:
+ *    - There is no "production" record in the db. The closest thing is "show".
+ *    - A "show" may contain multiple pieces, called "stagings"
+ *    - Each staging may have a script, or be unscripted.
+ *
+ *  The name of a show, as it stands, is based on fallback logic:
+ *    1. If the show has multiple stagings, use the show name.
+ *    2. If the show is a single staging but has no script, use the staging name.
+ *    3. If the show is a single staging and has a script, user the script name.
+ */
+
+class Production {
+  static getByShowId(id) {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select 
+            sh.id show_id,
+            sh.name show_name,
+            sh.show_notes,
+            so.order staging_order,
+            st.name staging_name,
+            st.staging_notes,
+            sc.name script_name,
+            sc.synopsis,
+            min(ss.showtime) opening,
+            max(ss.showtime) closing
+        from \`show\` sh
+          inner join show_order so         on sh.id = so.show_id
+          inner join staging st            on st.id = so.staging_id 
+          left join  scheduled_showing ss  on sh.id = ss.show_id 
+          left join  staging_of_script sos on st.id = sos.staging_id
+          left join  script sc             on sc.id = sos.script_id
+        where sh.id = ?
+        group by show_id
+      `;
+      connection.query(query, [id], (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          if (results.length) {
+            var production = Production._productionFromQueryResult(results[0]);
+            resolve(production);
+          } else {
+            resolve(null);
+          }
+        }
+        connection.destroy();
+      });
+    });
+  }
+  static getListByProducingOrgId(orgId) {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select 
+            sh.id show_id,
+            sh.name show_name,
+            sh.show_notes,
+            so.order staging_order,
+            st.name staging_name,
+            st.staging_notes,
+            sc.name script_name,
+            sc.synopsis,
+            min(ss.showtime) opening,
+            max(ss.showtime) closing
+        from producing_org p
+          inner join \`show\` sh             on p.id = sh.producer_id
+          inner join   show_order so         on sh.id = so.show_id
+          inner join   staging st            on st.id = so.staging_id 
+          left join    scheduled_showing ss  on sh.id = ss.show_id 
+          left join    staging_of_script sos on st.id = sos.staging_id
+          left join    script sc             on sc.id = sos.script_id
+        where p.id = ?
+        group by show_id, show_name, show_notes, staging_order, 
+                 staging_notes, script_name, synopsis
+        order by closing desc
+      `;
+
+      connection.query(query, [orgId], (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          var upcomingProductions = [], pastProductions = [], production, now = Date.now();
+          for (var i = 0; i < results.length; i++) {
+            production = Production._productionFromOrgInfoAndDatesResults(results[i]);
+            if (production.closing > now) {
+              upcomingProductions.push(production);
+            } else {
+              pastProductions.push(production);
+            }
+          }
+          resolve({upcomingProductions, pastProductions});
+          connection.destroy();
+        }
+      });
+    });
+  }
+  static create(inputProduction) {
+    return new Promise((resolve, reject) => {
+      var conn = getMysqlConnection();
+
+      var {
+        orgId,
+        isScripted,
+        isSingleEvent,
+        opening,
+        closing
+      } = inputProduction;
+
+      var promises1 = [];
+      promises1.push(this._createHelper_insertShow(conn, orgId));
+      promises1.push(this._createHelper_insertStaging(conn, inputProduction));
+
+      if (isScripted) {
+        promises1.push(this._createHelper_insertScript(conn, inputProduction));
+      }
+
+      Promise.all(promises1).then(
+        ([showId, stagingId, scriptId]) => {
+          var promises2 = [];
+          promises2.push(this._createHelper_createShowOrderWithStaging(conn, showId, stagingId));
+          promises2.push(this._createHelper_addShowingDate(conn, showId, opening));
+
+          if (!isSingleEvent) {
+            promises2.push(this._createHelper_addShowingDate(conn, showId, closing));
+          }
+          if (scriptId) {
+            promises2.push(this._createHelper_makeStagingScripted(conn, stagingId, scriptId));
+          }
+
+          Promise.all(promises2).then(
+            () => {
+              resolve({showId});
+              conn.destroy();
+            }
+          ).catch(
+            reason => {
+              reject(reason);
+              conn.destroy();
+            }
+          );
+        }
+      ).catch(
+        reason => {
+          reject(reason);
+          conn.destroy();
+        }
+      );
+
+    });
+  }
+  static _createHelper_insertShow(conn, orgId) {
+    return new Promise((resolve, reject) => {
+      var query = "insert into `show` (producer_id) values (?)";
+      conn.query(query, [orgId], (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result.insertId);
+        }
+      });
+    });
+  }
+  static _createHelper_insertStaging(conn, inputProduction) {
+    return new Promise((resolve, reject) => {
+      var query, params;
+      if (inputProduction.isScripted) {
+        query = "insert into staging () values ()";
+        params = [];
+      } else {
+        var {stagingTitle, description} = inputProduction;
+        query = "insert into staging (name, staging_notes) values (?, ?)";
+        params = [stagingTitle, description];
+      }
+      conn.query(query, params, (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result.insertId);
+        }
+      });
+    });
+  }
+  static _createHelper_insertScript(conn, inputProduction) {
+    return new Promise((resolve, reject) => {
+      var {scriptTitle, synopsis} = inputProduction;
+      var query = "insert into script (name, synopsis) values (?, ?)";
+      conn.query(query, [scriptTitle, synopsis], (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result.insertId);
+        }
+      });
+    });
+  }
+  static _createHelper_createShowOrderWithStaging(conn, showId, stagingId) {
+    return new Promise((resolve, reject) => {
+      var query = "insert into show_order (show_id, staging_id, `order`) values (?, ?, ?)";
+      conn.query(query, [showId, stagingId, 1], (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result.insertId);
+        }
+      });
+    });
+  }
+  // "date" is a timestamp using milliseconds.
+  static _createHelper_addShowingDate(conn, showId, date) {
+    return new Promise((resolve, reject) => {
+      var dateInSeconds = Math.floor(date / 1000);
+      var query = "insert into scheduled_showing (show_id, showtime) VALUES (?, FROM_UNIXTIME(?))";
+      conn.query(query, [showId, dateInSeconds], (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result.insertId);
+        }
+      });
+    });
+  }
+  static _createHelper_makeStagingScripted(conn, stagingId, scriptId) {
+    return new Promise((resolve, reject) => {
+      var query = "insert into staging_of_script (staging_id, script_id) values (?, ?)";
+      conn.query(query, [stagingId, scriptId], (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result.insertId);
+        }
+      });
+    });
+  }
+
+  /*
+   * Helper functions:
+   */
+
+  static _productionFromOrgInfoAndDatesResults(input) {
+    var p = new Production();
+    p.id = input.show_id;
+    p.title = input.show_name || input.staging_name || input.script_name;
+    p.description =  input.show_notes || input.staging_notes || input.synopsis;
+    p.opening = input.opening;
+    p.closing = input.closing;
+    return p;
+  }
+}
+
+
+
 module.exports = {
   Api,
   User,
   ProducingOrg,
+  Production,
 };

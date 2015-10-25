@@ -29,6 +29,7 @@ import {
   Api,
   User,
   ProducingOrg,
+  Production,
 } from './database';
 
 import config from '../config/config.json';
@@ -42,6 +43,10 @@ var {nodeInterface, nodeField} = nodeDefinitions(
       return Api.get();
     } else if (type === 'User') {
       return User.getById(id);
+    } else if (type === 'ProducingOrg') {
+      return ProducingOrg.getById(id);
+    } else if (type === 'Production') {
+      return Production.getByShowId(id);
     } else {
       return null;
     }
@@ -51,11 +56,21 @@ var {nodeInterface, nodeField} = nodeDefinitions(
       return apiType;
     } else if (obj instanceof User) {
       return userType;
+    } else if (obj instanceof ProducingOrg) {
+      return producingOrgType;
+    } else if (obj instanceof Production) {
+      return productionType;
     } else {
       return null;
     }
   }
 );
+
+
+
+
+
+
 
 /**
  * Seattle-theatre API:
@@ -94,6 +109,11 @@ var apiType = new GraphQLObjectType({
   }),
   interfaces: [nodeInterface],
 });
+
+
+
+
+
 
 /* 
  * User Schema
@@ -270,6 +290,13 @@ function signToken(payload) {
   return jwt.sign(payload, config.auth.secret, { expiresIn: "24h" });
 }
 
+
+
+
+
+
+
+
 /* 
  * Producing Org Schema
  */
@@ -294,15 +321,39 @@ var producingOrgType = new GraphQLObjectType({
     missionStatement: {
       type: GraphQLString,
       description: 'The organization\'s mission statement.'
+    },
+    upcomingProductions: {
+      type: new GraphQLList(productionType),
+      resolve: ({id}) => {
+        return new Promise((resolve, reject) => {
+          Production.getListByProducingOrgId(id).then(
+            ({upcomingProductions}) => resolve(upcomingProductions)
+          ).catch(
+            reason => reject(reason)
+          );
+        });
+      }
+    },
+    pastProductions: {
+      type: new GraphQLList(productionType),
+      resolve: ({id}) => {
+        return new Promise((resolve, reject) => {
+          Production.getListByProducingOrgId(id).then(
+            ({pastProductions}) => resolve(pastProductions)
+          ).catch(
+            reason => reject(reason)
+          );
+        });
+      }
     }
   }),
   interfaces: [nodeInterface],
 });
 
 /*
- * Mutation: CreateUser
- *  Creates a user account and then returns an authToken (so that
- *  the user will now be logged in).
+ * Mutation: CreateProducingOrg
+ *  Creates a producing organization and modifies the user's permissions
+ *  so that they have admin access to it.
  */
 
 var createProducingOrgInputType = new GraphQLInputObjectType({
@@ -371,15 +422,92 @@ var createProducingOrgMutation = mutationWithClientMutationId({
   },
 });
 
+
+
+
+
+
+
+/* 
+ * Production Schema
+ */
+
+var productionType = new GraphQLObjectType({
+  name: 'Production',
+  description: 'A theatrical production.',
+  fields: () => ({
+    id: globalIdField('Production'),
+    title: {
+      type: new GraphQLNonNull(GraphQLString),
+      description: 'The title of the production.'
+    },
+    description: { type: GraphQLString },
+    opening: { type: GraphQLInt },
+    closing: { type: GraphQLInt },
+  })
+});
+
+/*
+ * Mutation: CreateProduction
+ *  Creates a production by a given producing organization.
+ */
+
+var createProductionInputType = new GraphQLInputObjectType({
+  name: 'CreateProduction',
+  description: 'The input type for the CreateProduction mutation.',
+  fields: () => ({
+    orgId: { type: new GraphQLNonNull(GraphQLID) },
+    isScripted: { type: new GraphQLNonNull(GraphQLBoolean) },
+    isSingleEvent: { type: new GraphQLNonNull(GraphQLBoolean) },
+    stagingTitle: { type: GraphQLString },
+    description: { type: GraphQLString },
+    scriptTitle: { type: GraphQLString },
+    synopsis: { type: GraphQLString },
+    opening: { type: new GraphQLNonNull(GraphQLInt) },
+    closing: { type: new GraphQLNonNull(GraphQLInt) },
+  })
+});
+
+var createProductionMutation = mutationWithClientMutationId({
+  name: 'CreateProduction',
+  description: 'A mutation which creates a new production for a producing organization.',
+  inputFields: {
+    createProduction: { type: createProductionInputType },
+  },
+  outputFields: {
+    producingOrg: { 
+      type: producingOrgType,
+      resolve: ({orgId, producingOrgError}) => {
+        return ProducingOrg.getById(orgId);
+      }
+    }
+  },
+  mutateAndGetPayload: ({createProduction}) => {
+    var {id} = fromGlobalId(createProduction.orgId);
+    var orgId = createProduction.orgId = id;
+
+    return new Promise((resolve, reject) => {
+      Production.create(createProduction).then(
+        showId => resolve({showId, orgId})
+      ).catch(
+        reason => reject(reason)
+      );
+    });
+  },
+});
+
+
+
+
+
+
+
 var queryType = new GraphQLObjectType({
   name: 'Query',
   fields: () => ({
     node: nodeField,
     api: {
       type: apiType,
-      args: {
-        authToken: { type: GraphQLString }
-      },
       resolve: () => {
         var api = Api.get();
         return api;
@@ -394,6 +522,7 @@ var mutationType = new GraphQLObjectType({
     createUser: createUserMutation,
     login: loginMutation,
     createProducingOrg: createProducingOrgMutation,
+    createProduction: createProductionMutation,
   })
 });
 

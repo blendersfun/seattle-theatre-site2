@@ -4,6 +4,7 @@ import React from 'react';
 import Relay from 'react-relay';
 import {Link} from 'react-router';
 import cookie from '../../shared/cookie-manager';
+import history from '../../../history';
 
 import CreateAccountMutation from './create-account-mutation';
 
@@ -58,6 +59,7 @@ class App extends React.Component {
         if (authToken) {
           cookie.set("seathe_authToken", authToken);
           this.refs.form.reset();
+          history.pushState({}, '/');
         } else if (authError) {
           this.setState({authError});
         }
