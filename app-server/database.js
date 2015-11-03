@@ -408,7 +408,8 @@ class Production {
         isScripted,
         isSingleEvent,
         opening,
-        closing
+        closing,
+        spaceId,
       } = inputProduction;
 
       var promises1 = [];
@@ -430,6 +431,9 @@ class Production {
           }
           if (scriptId) {
             promises2.push(this._createHelper_makeStagingScripted(conn, stagingId, scriptId));
+          }
+          if (spaceId) {
+            promises2.push(this._createHelper_setPerformanceSpaceForShow(conn, showId, spaceId));
           }
 
           Promise.all(promises2).then(
@@ -536,6 +540,18 @@ class Production {
       });
     });
   }
+  static _createHelper_setPerformanceSpaceForShow(conn, showId, spaceId) {
+    return new Promise((resolve, reject) => {
+      var query = "insert into space_for_show (show_id, space_id) values (?, ?)";
+      conn.query(query, [showId, spaceId], (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result.insertId);
+        }
+      });
+    });
+  }
 
   /*
    * Helper functions:
@@ -586,6 +602,30 @@ class Venue {
       });
     });
   }
+  static getBySpaceId(spaceId) {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select v.*, a.* 
+        from performance_space ps,
+             venue v, 
+             address a
+        where ps.id = ? 
+          and v.id = ps.venue_id
+          and v.address_id = a.id
+      `;
+      connection.query(query, [spaceId], (err, results) => {
+        if (err) {
+          reject(err);
+        } else if (results.length) {
+          resolve(Venue._venueRecordToObject(results[0]));
+        } else {
+          resolve(null);
+        }
+        connection.destroy();
+      });
+    });
+  }
   static getAll() {
     return new Promise((resolve, reject) => {
       var connection = getMysqlConnection();
@@ -621,7 +661,50 @@ class Venue {
 }
 
 class PerformanceSpace {
-  static getById(id) {}
+  static getById(spaceId) {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select * 
+        from performance_space ps 
+        where ps.id = ?
+      `;
+      connection.query(query, [spaceId], (err, results) => {
+        if (err) {
+          reject(err);
+        } else if (results.length) {
+          resolve(PerformanceSpace._performanceSpaceRecordToObject(results[0]));
+        } else {
+          resolve(null);
+        }
+        connection.destroy();
+      });
+    });
+  }
+  static getByShowId(showId) {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select ps.* 
+        from \`show\` sh, 
+               space_for_show sfs,
+               performance_space ps 
+        where sh.id = ?
+          and sh.id = sfs.show_id
+          and ps.id = sfs.space_id 
+      `;
+      connection.query(query, [showId], (err, results) => {
+        if (err) {
+          reject(err);
+        } else if (results.length) {
+          resolve(PerformanceSpace._performanceSpaceRecordToObject(results[0]));
+        } else {
+          resolve(null);
+        }
+        connection.destroy();
+      });
+    });
+  }
   static getListByVenueId(venueId) {
     return new Promise((resolve, reject) => {
       var connection = getMysqlConnection();

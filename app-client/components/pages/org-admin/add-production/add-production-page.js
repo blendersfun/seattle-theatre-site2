@@ -30,7 +30,7 @@ class AddProductionPage extends React.Component {
           <div className="form-line">
             Closing Night <input type="date" ref="closing"/></div>
           <div className="form-line">
-            <SelectVenue api={this.props.api}/></div>
+            <SelectVenue api={this.props.api} ref="venue"/></div>
           <div className="form-lineBr">
             <button onClick={this.addProduction}>Add</button>
             {' '}
@@ -66,12 +66,14 @@ class AddProductionPage extends React.Component {
   }
   addProduction = (e) => {
     e.preventDefault();
+    
     var createProduction = {
       orgId: this.props.user.orgAdminFor.id,
       isScripted: this.refs.isScripted.checked,
       isSingleEvent: false,
       opening: new Date(this.refs.opening.value).getTime(),
       closing: new Date(this.refs.closing.value).getTime(),
+      spaceId: this.refs.venue.refs.component.value().space.id,
     };
     if (createProduction.isScripted) {
       createProduction.scriptTitle = this.refs.scriptTitle.value;

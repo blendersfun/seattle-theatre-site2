@@ -106,6 +106,8 @@ class SelectVenueComponent extends React.Component {
     this.setState({ selectedVenue: null, selectedSpace: null });
     this.refs.input.focus();
   }
+
+  value = () => ({ venue: this.state.selectedVenue, space: this.state.selectedSpace })
 }
 
 var SelectVenue = Relay.createContainer(SelectVenueComponent, {

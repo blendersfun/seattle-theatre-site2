@@ -95,6 +95,14 @@ var OrgAdmin = Relay.createContainer(OrgAdminPage, {
             description,
             opening,
             closing,
+            performanceSpace {
+              id,
+              name,
+              venue {
+                id,
+                name,
+              }
+            },
           },
           pastProductions {
             id,

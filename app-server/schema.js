@@ -473,6 +473,10 @@ var productionType = new GraphQLObjectType({
     description: { type: GraphQLString },
     opening: { type: GraphQLInt },
     closing: { type: GraphQLInt },
+    performanceSpace: {
+      type: performanceSpaceType,
+      resolve: ({id}) => PerformanceSpace.getByShowId(id)
+    }
   })
 });
 
@@ -494,6 +498,7 @@ var createProductionInputType = new GraphQLInputObjectType({
     synopsis: { type: GraphQLString },
     opening: { type: new GraphQLNonNull(GraphQLInt) },
     closing: { type: new GraphQLNonNull(GraphQLInt) },
+    spaceId: { type: GraphQLID },
   })
 });
 
@@ -512,8 +517,13 @@ var createProductionMutation = mutationWithClientMutationId({
     }
   },
   mutateAndGetPayload: ({createProduction}) => {
-    var {id} = fromGlobalId(createProduction.orgId);
-    var orgId = createProduction.orgId = id;
+    var orgIdParts = fromGlobalId(createProduction.orgId);
+    var orgId = createProduction.orgId = orgIdParts.id;
+
+    if (createProduction.spaceId) {
+      var spaceIdParts = fromGlobalId(createProduction.spaceId);
+      createProduction.spaceId = spaceIdParts.id;
+    }
 
     return new Promise((resolve, reject) => {
       Production.create(createProduction).then(
@@ -566,6 +576,10 @@ var performanceSpaceType = new GraphQLObjectType({
     capacity: { type: GraphQLInt },
     style: { type: performanceSpaceStyleType },
     description: { type: GraphQLString },
+    venue: {
+      type: venueType,
+      resolve: ({id}) => Venue.getBySpaceId(id)
+    }
   }),
   interfaces: [nodeInterface],
 });
