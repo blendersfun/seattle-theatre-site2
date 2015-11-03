@@ -554,9 +554,118 @@ class Production {
 
 
 
+
+
+
+
+
+
+
+/*
+ * Venues
+ */
+
+class Venue {
+  static getById(id) {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select * from venue v, address a 
+        where v.address_id = a.id
+        and v.id = ?
+      `;
+      connection.query(query, [id], (err, results) => {
+        if (err) {
+          reject(err);
+        } else if (results.length) {
+          resolve(Venue._venueRecordToObject(results[0]));
+        } else {
+          resolve(null);
+        }
+        connection.destroy();
+      });
+    });
+  }
+  static getAll() {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select * from venue v, address a 
+        where v.address_id = a.id
+        order by v.name
+      `;
+      connection.query(query, [], (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results.map(Venue._venueRecordToObject));
+        }
+        connection.destroy();
+      });
+    });
+  }
+
+  static _venueRecordToObject(input) {
+    var venue = new Venue();
+    venue.id = input.id;
+    venue.name = input.name;
+    venue.addressLine1 = input.line1;
+    venue.addressLine2 = input.line2;
+    venue.city = input.city;
+    venue.state = input.state;
+    venue.zip = input.zip;
+    venue.lat = input.lat;
+    venue.lng = input.lng;
+    return venue;
+  }
+}
+
+class PerformanceSpace {
+  static getById(id) {}
+  static getListByVenueId(venueId) {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      var query = `
+        select * 
+        from venue v, performance_space ps 
+        where v.id = ps.venue_id
+          and v.id = ?
+        order by ps.name
+      `;
+      connection.query(query, [venueId], (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results.map(PerformanceSpace._performanceSpaceRecordToObject));
+        }
+        connection.destroy();
+      });
+    });
+  }
+
+  static _performanceSpaceRecordToObject(input) {
+    var space = new PerformanceSpace();
+    space.id = input.id;
+    space.name = input.name;
+    space.capacity = input.seat_count;
+    space.style = null;
+    space.description = input.flavor_text;
+    return space;
+  }
+}
+
+
+
+
+
+
+
+
 module.exports = {
   Api,
   User,
   ProducingOrg,
   Production,
+  Venue,
+  PerformanceSpace,
 };

@@ -30,6 +30,8 @@ import {
   User,
   ProducingOrg,
   Production,
+  Venue,
+  PerformanceSpace,
 } from './database';
 
 import config from '../config/config.json';
@@ -47,6 +49,10 @@ var {nodeInterface, nodeField} = nodeDefinitions(
       return ProducingOrg.getById(id);
     } else if (type === 'Production') {
       return Production.getByShowId(id);
+    } else if (type === 'Venue') {
+      return Venue.getById(id);
+    } else if (type === 'PerformanceSpace') {
+      return PerformanceSpace.getById(id);
     } else {
       return null;
     }
@@ -60,6 +66,10 @@ var {nodeInterface, nodeField} = nodeDefinitions(
       return producingOrgType;
     } else if (obj instanceof Production) {
       return productionType;
+    } else if (obj instanceof Venue) {
+      return venueType;
+    } else if (obj instanceof PerformanceSpace) {
+      return performanceSpaceType;
     } else {
       return null;
     }
@@ -103,6 +113,25 @@ var apiType = new GraphQLObjectType({
         } else {
           return null;
         }
+      }
+    },
+    venues: {
+      type: new GraphQLList(venueType),
+      resolve: () => {
+        return Venue.getAll();
+      }
+    },
+    venue: {
+      type: venueType,
+      args: {
+        id: { type: GraphQLID },
+      },
+      resolve: (_, {id}) => {
+        if (id) {
+          var parts = fromGlobalId(id);
+          return Venue.getById(parts.id);
+        }
+        return null;
       }
     },
     producingOrgError: { type: producingOrgErrorType },
@@ -495,6 +524,71 @@ var createProductionMutation = mutationWithClientMutationId({
     });
   },
 });
+
+
+
+
+
+
+/* 
+ * Venue Schema
+ */
+
+var venueType = new GraphQLObjectType({
+  name: 'Venue',
+  description: 'A venue, containing one ore more perforances spaces which may be used to present a production.',
+  fields: () => ({
+    id: globalIdField('Venue'),
+    name: { type: new GraphQLNonNull(GraphQLString) },
+    addressLine1: { type: new GraphQLNonNull(GraphQLString) },
+    addressLine2: { type: GraphQLString },
+    city: { type: new GraphQLNonNull(GraphQLString) },
+    state: { type: new GraphQLNonNull(GraphQLString) },
+    zip: { type: new GraphQLNonNull(GraphQLString) },
+    lat: { type: GraphQLFloat },
+    lng: { type: GraphQLFloat },
+    performanceSpaces: { 
+      type: new GraphQLList(performanceSpaceType),
+      resolve: ({id}) => {
+        return PerformanceSpace.getListByVenueId(id);
+      }
+    },
+  }),
+  interfaces: [nodeInterface],
+});
+
+var performanceSpaceType = new GraphQLObjectType({
+  name: 'PerformanceSpace',
+  description: 'A performance space inside a venue where a production may be presented.',
+  fields: () => ({
+    id: globalIdField('PerformanceSpace'),
+    name: { type: new GraphQLNonNull(GraphQLString) },
+    capacity: { type: GraphQLInt },
+    style: { type: performanceSpaceStyleType },
+    description: { type: GraphQLString },
+  }),
+  interfaces: [nodeInterface],
+});
+
+var performanceSpaceStyleType = new GraphQLEnumType({
+  name: 'PerformanceSpaceStyle',
+  description: 'A style of performance space.',
+  values: {
+    PROSCENIUM: {},
+    ARENA: {},
+    THRUST: {},
+    BLACK_BOX: {},
+    FOUND: {},
+  }
+});
+
+
+
+
+
+
+
+
 
 
 

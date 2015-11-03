@@ -8,6 +8,7 @@ import classNames from 'classnames';
 import history from '../../../../history';
 import BasePage from '../../../shared/base-page';
 import AddProductionMutation from './add-production-mutation';
+import SelectVenue from './select-venue';
 
 class AddProductionPage extends React.Component {
   state = {
@@ -28,6 +29,8 @@ class AddProductionPage extends React.Component {
             Opening Night <input type="date" ref="opening"/></div>
           <div className="form-line">
             Closing Night <input type="date" ref="closing"/></div>
+          <div className="form-line">
+            <SelectVenue api={this.props.api}/></div>
           <div className="form-lineBr">
             <button onClick={this.addProduction}>Add</button>
             {' '}
@@ -109,6 +112,7 @@ var AddProduction = Relay.createContainer(AddProductionPage, {
     api: () => Relay.QL`
       fragment on Api {
         id,
+        ${SelectVenue.getFragment('api')}
       }
     `,
     user: () => Relay.QL`
