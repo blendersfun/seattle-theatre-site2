@@ -153,6 +153,23 @@ class User {
  */
 
 class ProducingOrg {
+  static getAll() {
+    return new Promise((resolve, reject) => {
+      var connection = getMysqlConnection();
+      connection.query("select * from producing_org order by name", [], (err, results) => {
+        if (err) {
+          reject(err);
+        } else {
+          if (results.length) {
+            resolve(results.map(ProducingOrg._producingOrgRecordToObject));
+          } else {
+            resolve(null);
+          }
+        }
+        connection.destroy();
+      });
+    });
+  }
   static getById(id) {
     return new Promise((resolve, reject) => {
       var connection = getMysqlConnection();

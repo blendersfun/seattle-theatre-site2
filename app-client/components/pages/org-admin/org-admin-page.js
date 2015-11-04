@@ -4,6 +4,7 @@ import React from 'react';
 import Relay from 'react-relay';
 import {Link} from 'react-router';
 import classNames from 'classnames';
+import moment from 'moment';
 
 import history from '../../../history';
 import BasePage from '../../shared/base-page';
@@ -13,11 +14,9 @@ class OrgAdminPage extends React.Component {
     activeTab: 'productions'
   }
   render() {
-    if (!this.accessAllowed()) return null;
-
     return (
       <div id="orgAdminPage">
-        <h2>{this.props.user.orgAdminFor.name}</h2>
+        <h2>{this.props.api.producingOrganization.name}</h2>
         <div className="tabs">
           <a className={classNames("tabs-tab",{"active": this.state.activeTab === 'productions'})} 
             href="javascript:;"
@@ -41,10 +40,14 @@ class OrgAdminPage extends React.Component {
     return (
       <div>
         <h3>Upcoming Productions</h3>
-        {this.props.user.orgAdminFor.upcomingProductions.map((production) => (
+        {this.props.api.producingOrganization.upcomingProductions.map((production) => (
           <div key={production.id}>
+            <div className="orgAdminPage-productionDetails">
+              <div>{this.renderDateRange(production.opening, production.closing)}</div>
+              <div>{this.renderVenue(production)}</div>
+            </div>
             <div><strong>{production.title}</strong></div>
-            <div>{production.description}</div> <br/>
+            <div style={{whiteSpace: 'pre-line'}}>{production.description}</div> <br/>
           </div>
         ))}
         <button onClick={this.addProduction}>Add Production</button>
@@ -56,37 +59,57 @@ class OrgAdminPage extends React.Component {
     return (
       <div>
         <h3>Mission Statement</h3>
-        {this.props.user.orgAdminFor.missionStatement}
+        <div style={{whiteSpace: 'pre-line'}}>{this.props.api.producingOrganization.missionStatement}</div>
       </div>
     );
   }
-  addProduction = () => {
-    history.pushState({}, '/org-admin/add-production');
-  }
-
-  accessAllowed = (props) => {
-    props = props || this.props;
-    return props.user && props.user.orgAdminFor
-  }
-  redirectIfImproperAccess = (props) => {
-    if (!this.accessAllowed(props)) {
-      setTimeout(() => history.pushState({}, '/'), 10);
+  renderDateRange = (start, end) => {
+    start = moment(start);
+    end = moment(end);
+    if (start.year() === end.year()) {
+      if (start.month() === end.month()) {
+        if (start.date() === end.date()) {
+          return moment(start).format('MMM Do, YYYY');
+        } else {
+          return moment(start).format('MMM Do') +' - '+ moment(end).format('Do, YYYY');
+        }
+      } else {
+        return moment(start).format('MMM Do') +' - '+ moment(end).format('MMM Do, YYYY');
+      }
+    } else {
+      return moment(start).format('MMM Do, YYYY') +' - '+ moment(end).format('MMM Do, YYYY');
     }
   }
-  componentWillMount = () => this.redirectIfImproperAccess()
-  componentWillUpdate = (props) => this.redirectIfImproperAccess(props)
+  renderVenue = production => {
+    if (!production.performanceSpace || !production.performanceSpace.venue) return null;
+    var venueName = production.performanceSpace.venue.name;
+    var spaceName = production.performanceSpace.name;
+    if (venueName === spaceName) {
+      return venueName;
+    } else {
+      return venueName + ': ' + spaceName;
+    }
+  }
+  addProduction = () => {
+    history.pushState({}, '/org-admin/' +this.props.api.producingOrganization.id+ '/add-production');
+  }
 }
 
 var OrgAdmin = Relay.createContainer(OrgAdminPage, {
+  initialVariables: {
+    orgId: null
+  },
+  prepareVariables: (prevVars) => {
+    var orgId = location.pathname.match(/\/org-admin\/([^\/]+)/)[1];
+    prevVars.orgId = orgId;
+    return prevVars;
+  },
   fragments: {
     api: () => Relay.QL`
       fragment on Api {
         id,
-      }
-    `,
-    user: () => Relay.QL`
-      fragment on User {
-        orgAdminFor {
+        producingOrganization(id: $orgId) {
+          id,
           name,
           missionStatement,
           upcomingProductions {
@@ -111,6 +134,13 @@ var OrgAdmin = Relay.createContainer(OrgAdminPage, {
             opening,
             closing,
           },
+        }
+      }
+    `,
+    user: () => Relay.QL`
+      fragment on User {
+        orgAdminFor {
+          id,
         }
       }
     `,

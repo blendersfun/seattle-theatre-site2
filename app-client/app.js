@@ -15,13 +15,14 @@ import Account from './components/pages/account';
 import CreateOrg from './components/pages/create-org';
 import OrgAdmin from './components/pages/org-admin';
 import AddProduction from './components/pages/org-admin/add-production';
+import ManageOrgs from './components/pages/manage-orgs';
 
 var ApiQueries = {
   api: (Component) => Relay.QL`
     query {
       api {
-        ${Component.getFragment('api')},
-      },
+        ${Component.getFragment('api')}
+      }
     }
   `,
 };
@@ -47,12 +48,16 @@ ReactDOM.render(
       component={CreateOrg} 
       queries={ApiQueries}/>
 
-    <Route path="/org-admin" 
+    <Route path="/org-admin/:orgId" 
       component={OrgAdmin} 
       queries={ApiQueries}/>
 
-    <Route path="/org-admin/add-production" 
+    <Route path="/org-admin/:orgId/add-production" 
       component={AddProduction} 
+      queries={ApiQueries}/>
+
+    <Route path="/orgs-admin" 
+      component={ManageOrgs} 
       queries={ApiQueries}/>
   </Router>,
   document.getElementById('root')

@@ -12,6 +12,8 @@ class UserMenuComponent extends React.Component {
   };
 
   render() {
+    var orgAdminFor = this.props.user.orgAdminFor;
+
     return (
       <span id="userMenu"
         onMouseEnter={this.show}
@@ -22,7 +24,11 @@ class UserMenuComponent extends React.Component {
             <Link to="/account">Account</Link></div>
           {this.isOrgAdmin(
             <div className="userMenu-item">
-              <Link to="/org-admin">My Organization</Link></div>
+              <Link to={"/org-admin/" + (orgAdminFor ? orgAdminFor.id : '')}>My Organization</Link></div>
+          )}
+          {this.isSysAdmin(
+            <div className="userMenu-item">
+              <Link to="/orgs-admin/">Manage Organizations</Link></div>
           )}
           <div className="userMenu-item">
             <a href="javascript:;" onClick={this.logout}>Logout</a></div>
@@ -45,6 +51,9 @@ var UserMenu = Relay.createContainer(UserMenuComponent, {
     user: () => Relay.QL`
       fragment on User {
         accessLevel,
+        orgAdminFor {
+          id,
+        }
       }
     `,
   },

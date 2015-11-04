@@ -16,8 +16,6 @@ class AddProductionPage extends React.Component {
   }
 
   render() {
-    if (!this.accessAllowed()) return null;
-
     return (
       <div id="addProductionPage">
         <h2>Add Production</h2>
@@ -43,7 +41,7 @@ class AddProductionPage extends React.Component {
   renderScriptedInputs = () => (
     <div>
       <div className="form-line">
-        Script Title <input ref="scriptTitle"/></div>
+        Script Title <input ref="scriptTitle" className="input-large"/></div>
       <div className="form-line">
         Synopsis <br/> <textarea ref="synopsis"></textarea></div>
     </div>
@@ -51,7 +49,7 @@ class AddProductionPage extends React.Component {
   renderNonScriptedInputs = () => (
     <div>
       <div className="form-line">
-        Title <input ref="title"/></div>
+        Title <input ref="title" className="input-large"/></div>
       <div className="form-line">
         Description <br/> <textarea ref="description"></textarea></div>
     </div>
@@ -62,18 +60,20 @@ class AddProductionPage extends React.Component {
 
   cancel = (e) => {
     e.preventDefault();
-    history.pushState({}, '/org-admin');
+    history.pushState({}, '/org-admin/' + this.props.api.producingOrganization.id);
   }
   addProduction = (e) => {
     e.preventDefault();
+
+    var space = this.refs.venue.refs.component.value().space;
     
     var createProduction = {
-      orgId: this.props.user.orgAdminFor.id,
+      orgId: this.props.api.producingOrganization.id,
       isScripted: this.refs.isScripted.checked,
       isSingleEvent: false,
       opening: new Date(this.refs.opening.value).getTime(),
       closing: new Date(this.refs.closing.value).getTime(),
-      spaceId: this.refs.venue.refs.component.value().space.id,
+      spaceId: space && space.id,
     };
     if (createProduction.isScripted) {
       createProduction.scriptTitle = this.refs.scriptTitle.value;
@@ -84,45 +84,41 @@ class AddProductionPage extends React.Component {
     }
 
     var mutation = new AddProductionMutation({
-      orgId: this.props.user.orgAdminFor.id, 
+      orgId: this.props.api.producingOrganization.id, 
       createProduction: createProduction
     });
 
     Relay.Store.update(mutation, {
       onSuccess: result => {
-        history.pushState({}, '/org-admin');
+        history.pushState({}, '/org-admin/' + this.props.api.producingOrganization.id);
       },
       onFailure: () => console.log('org create failure')
     });
   }
-
-  accessAllowed = (props) => {
-    props = props || this.props;
-    return props.user && props.user.orgAdminFor
-  }
-  redirectIfImproperAccess = (props) => {
-    if (!this.accessAllowed(props)) {
-      setTimeout(() => history.pushState({}, '/'), 10);
-    }
-  }
-  componentWillMount = () => this.redirectIfImproperAccess()
-  componentWillUpdate = (props) => this.redirectIfImproperAccess(props)
 }
 
 var AddProduction = Relay.createContainer(AddProductionPage, {
+  initialVariables: {
+    orgId: null
+  },
+  prepareVariables: (prevVars) => {
+    var orgId = location.pathname.match(/\/org-admin\/([^\/]+)/)[1];
+    prevVars.orgId = orgId;
+    return prevVars;
+  },
   fragments: {
     api: () => Relay.QL`
       fragment on Api {
         id,
+        producingOrganization(id: $orgId) {
+          id,
+        },
         ${SelectVenue.getFragment('api')}
       }
     `,
     user: () => Relay.QL`
       fragment on User {
         id,
-        orgAdminFor {
-          id,
-        },
       }
     `,
   },

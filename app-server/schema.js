@@ -117,9 +117,7 @@ var apiType = new GraphQLObjectType({
     },
     venues: {
       type: new GraphQLList(venueType),
-      resolve: () => {
-        return Venue.getAll();
-      }
+      resolve: () => Venue.getAll()
     },
     venue: {
       type: venueType,
@@ -133,6 +131,23 @@ var apiType = new GraphQLObjectType({
         }
         return null;
       }
+    },
+    producingOrganizations: {
+      type: new GraphQLList(producingOrgType),
+      resolve: () => ProducingOrg.getAll()
+    },
+    producingOrganization: {
+      type: producingOrgType,
+      args: {
+        id: { type: GraphQLID }
+      },
+      resolve: (_, {id}) => {
+        if (id) {
+          var parts = fromGlobalId(id);
+          return ProducingOrg.getById(parts.id);
+        }
+        return null;
+      } 
     },
     producingOrgError: { type: producingOrgErrorType },
   }),
@@ -356,7 +371,12 @@ var producingOrgType = new GraphQLObjectType({
       resolve: ({id}) => {
         return new Promise((resolve, reject) => {
           Production.getListByProducingOrgId(id).then(
-            ({upcomingProductions}) => resolve(upcomingProductions)
+            ({upcomingProductions}) => {
+              upcomingProductions.sort((a, b) => {
+                return a.opening - b.opening;
+              });
+              resolve(upcomingProductions);
+            }
           ).catch(
             reason => reject(reason)
           );
