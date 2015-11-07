@@ -102,14 +102,8 @@ var apiType = new GraphQLObjectType({
         var authToken = args.authToken;
 
         if (authToken) {
-          return new Promise((resolve, reject) => {
-            var decoded = jwt.verify(authToken, config.auth.secret);
-            User.getById(decoded.userId).then(
-              user => resolve(user)
-            ).catch(
-              reason => reject(reason)
-            );
-          });
+          var decoded = jwt.verify(authToken, config.auth.secret);
+          return User.getById(decoded.userId);
         } else {
           return null;
         }
@@ -181,13 +175,7 @@ var userType = new GraphQLObjectType({
       description: 'The producing organization this user administers.',
       resolve: ({id, accessLevel}) => {
         if (accessLevel === 'ORG_ADMIN') {
-          return new Promise((resolve, reject) => {
-            ProducingOrg.getByOrgAdminUserId(id).then(
-              org => resolve(org)
-            ).catch(
-              reason => reject(reason)
-            );
-          });
+          return ProducingOrg.getByOrgAdminUserId(id);
         } else {
           return null;
         }
@@ -244,27 +232,25 @@ var createUserMutation = mutationWithClientMutationId({
       password: hashPassword(createUser.password)
     };
 
-    return new Promise((resolve, reject) => {
-      User.create(createUserDB).then(
-        ({user, error}) => {
-          var userId = null, accessLevel = null;
-          var authToken = null;
-          var authError = null;
+    return User.create(createUserDB).then(
+      user => {
+        var userId = null, accessLevel = null;
+        var authToken = null;
 
-          if (error && error.code === 'ER_DUP_ENTRY') {
-            authError = 'USER_ALREADY_EXISTS';
-          } else {
-            userId = user.id;
-            accessLevel = user.accessLevel;
-            authToken = signToken({userId, accessLevel});
-          }
+        userId = user.id;
+        accessLevel = user.accessLevel;
+        authToken = signToken({userId, accessLevel});
 
-          resolve({ authToken, userId, authError });
+        return {authToken, userId};
+      }
+    ).catch(
+      err => {
+        if (err.code === 'ER_DUP_ENTRY') {
+          return {authError: 'USER_ALREADY_EXISTS'};
         }
-      ).catch(
-        reason => reject(reason)
-      );
-    });
+        return Promise.reject(err);
+      }
+    );
   },
 });
 
@@ -302,19 +288,19 @@ var loginMutation = mutationWithClientMutationId({
   },
   mutateAndGetPayload: ({login}) => {
     return new Promise((resolve, reject) => {
-      User.getUserAndPasswordByEmail(login.email).then(
-        ({user, password}) => {
+      User.getIdAndPasswordByEmail(login.email).then(
+        ({id, password}) => {
           var authToken = null;
           var userId = null, accessLevel = null;
           var authError = null;
 
-          if (!user) {
+          if (!password) {
             authError = 'INVALID_CREDENTIALS';
           } else if (hashPassword(login.password) !== password) {
             authError = 'INVALID_CREDENTIALS';
           } else {
-            userId = user.id;
-            accessLevel = user.accessLevel;
+            userId = id;
+            accessLevel = 'ORG_ADMIN';
             authToken = signToken({userId, accessLevel});
           }
 
@@ -368,32 +354,22 @@ var producingOrgType = new GraphQLObjectType({
     },
     upcomingProductions: {
       type: new GraphQLList(productionType),
-      resolve: ({id}) => {
-        return new Promise((resolve, reject) => {
-          Production.getListByProducingOrgId(id).then(
-            ({upcomingProductions}) => {
-              upcomingProductions.sort((a, b) => {
-                return a.opening - b.opening;
-              });
-              resolve(upcomingProductions);
-            }
-          ).catch(
-            reason => reject(reason)
-          );
-        });
-      }
+      resolve: ({id}) => 
+        Production.getListByProducingOrgId(id).then(
+          ({upcomingProductions}) => {
+            upcomingProductions.sort((a, b) => {
+              return a.opening - b.opening;
+            });
+            return upcomingProductions;
+          }
+        )
     },
     pastProductions: {
       type: new GraphQLList(productionType),
-      resolve: ({id}) => {
-        return new Promise((resolve, reject) => {
-          Production.getListByProducingOrgId(id).then(
-            ({pastProductions}) => resolve(pastProductions)
-          ).catch(
-            reason => reject(reason)
-          );
-        });
-      }
+      resolve: ({id}) =>
+        Production.getListByProducingOrgId(id).then(
+          ({pastProductions}) => pastProductions
+        )
     }
   }),
   interfaces: [nodeInterface],
@@ -438,36 +414,27 @@ var createProducingOrgMutation = mutationWithClientMutationId({
     var {type, id} = fromGlobalId(createProducingOrg.userId);
     createProducingOrg.userId = id;
 
-    return new Promise((resolve, reject) => {
-      ProducingOrg.create(createProducingOrg).then(
-        ({producingOrg, user, error}) => {
-          var authToken = null;
-          var userId = null, accessLevel = null;
-          var producingOrgError = null;
+    return ProducingOrg.create(createProducingOrg).then(
+      ({producingOrg, user}) => {
+        var authToken = null;
+        var userId = null, accessLevel = null;
 
-          if (error) {
-            if (error.code === 'ER_DUP_ENTRY') {
-              producingOrgError = 'PRODUCING_ORG_ALREADY_EXISTS';
-              resolve({producingOrgError});
-            } else {
-              reject(error);
-            }
-          } else {
-            if (user) {
-              userId = user.id;
-              accessLevel = user.accessLevel;
-              authToken = signToken({userId, accessLevel});
-            } else {
-              console.warn("Updated user record missing during createOrg mutate.");
-            }
-          }
-
-          resolve({authToken, userId});
+        if (user) {
+          userId = user.id;
+          accessLevel = user.accessLevel;
+          authToken = signToken({userId, accessLevel});
         }
-      ).catch(
-        reason => reject(reason)
-      );
-    });
+
+        return {authToken, userId};
+      }
+    ).catch(
+      err => {
+        if (err.code === 'ER_DUP_ENTRY') {
+          return {producingOrgError: 'PRODUCING_ORG_ALREADY_EXISTS'};
+        }
+        return Promise.reject(err);
+      }
+    );
   },
 });
 
