@@ -2,7 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { Schema } from '../data/schema';
+import { Schema } from '../app-server/schema';
 import { graphql }  from 'graphql';
 import { introspectionQuery, printSchema } from 'graphql/utilities';
 
@@ -16,7 +16,7 @@ async () => {
     );
   } else {
     fs.writeFileSync(
-      path.join(__dirname, '../data/schema.json'),
+      path.join(__dirname, '../app-server/schema.json'),
       JSON.stringify(result, null, 2)
     );
   }
@@ -24,6 +24,6 @@ async () => {
 
 // Save user readable type system shorthand of schema
 fs.writeFileSync(
-  path.join(__dirname, '../data/schema.graphql'),
+  path.join(__dirname, '../app-server/schema.graphql'),
   printSchema(Schema)
 );
