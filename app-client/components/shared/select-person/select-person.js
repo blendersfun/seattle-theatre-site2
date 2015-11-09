@@ -44,10 +44,12 @@ class SelectPersonComponent extends React.Component {
   inputOnChange = (e) => {
     var query = e.currentTarget.value;
     this.setState({ query: query });
-    this.props.relay.setVariables({ query: query });
+    this.props.relay.setVariables({ query: this.formatQueryForServer(query) });
   }
   inputOnFocus = (e) => this.setState({ menuShowing: true })
   inputOnBlur = (e) => setTimeout(() => this.setState({ menuShowing: false }), 100)
+  
+  formatQueryForServer = q => q.replace(/^\s*(.*?)\s*$/, '$1').replace(/\s+/g, ',')
 
   renderSelectedControls = () => {
     if (!this.state.selected) 
