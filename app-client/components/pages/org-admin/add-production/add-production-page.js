@@ -9,6 +9,7 @@ import history from '../../../../history';
 import BasePage from '../../../shared/base-page';
 import AddProductionMutation from './add-production-mutation';
 import SelectVenue from './select-venue';
+import SelectPerson from '../../../shared/select-person';
 
 class AddProductionPage extends React.Component {
   state = {
@@ -23,6 +24,8 @@ class AddProductionPage extends React.Component {
           <div className="form-line">
             <input type="checkbox" ref="isScripted" onChange={this.scriptedChange} defaultChecked="checked"/> Is Scripted</div>
           { this.state.isScripted ? this.renderScriptedInputs() : this.renderNonScriptedInputs() }
+          <SelectPerson label="Director" api={this.props.api}/>
+          <SelectPerson label="Stage Manager" api={this.props.api}/>
           <div className="form-line">
             Opening Night <input type="date" ref="opening"/></div>
           <div className="form-line">
@@ -114,6 +117,7 @@ var AddProduction = Relay.createContainer(AddProductionPage, {
           id,
         },
         ${SelectVenue.getFragment('api')}
+        ${SelectPerson.getFragment('api')}
       }
     `,
     user: () => Relay.QL`

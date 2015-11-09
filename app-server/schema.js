@@ -28,6 +28,7 @@ import {
 import {
   Api,
   User,
+  Person,
   ProducingOrg,
   Production,
   Venue,
@@ -144,6 +145,18 @@ var apiType = new GraphQLObjectType({
       } 
     },
     producingOrgError: { type: producingOrgErrorType },
+    personSearch: {
+      type: new GraphQLList(personType),
+      args: {
+        query: { type: GraphQLString }
+      },
+      resolve: (_, {query}) => {
+        if (query === '') return [];
+        
+        var terms = query.split(',');
+        return Person.search(terms);
+      }
+    },
   }),
   interfaces: [nodeInterface],
 });
@@ -319,6 +332,37 @@ function hashPassword(plainPassword) {
 function signToken(payload) {
   return jwt.sign(payload, config.auth.secret, { expiresIn: "24h" });
 }
+
+
+
+
+
+
+
+/*
+ * Person Schema
+ */
+
+var personType = new GraphQLObjectType({
+  name: 'Person',
+  description: 'A person who participates in local theatre events.',
+  fields: () => ({
+    id: globalIdField('Person'),
+    firstName: {
+      type: new GraphQLNonNull(GraphQLString),
+      description: 'The person\'s first, or given name.'
+    },
+    middleName: {
+      type: GraphQLString,
+      description: 'The person\'s middle name.'
+    },
+    lastName: {
+      type: new GraphQLNonNull(GraphQLString),
+      description: 'The person\'s last, or family name.'
+    }
+  }),
+  interfaces: [nodeInterface],
+});
 
 
 

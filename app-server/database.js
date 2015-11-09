@@ -12,6 +12,7 @@ import {
 import User from './user-db';
 import ProducingOrg from './producing-org-db';
 import {Production, Script} from './production-db';
+import Person from './person-db';
 
 class Api {
   static get() {
@@ -199,6 +200,7 @@ class PerformanceSpace {
 module.exports = {
   Api,
   User,
+  Person,
   ProducingOrg,
   Production,
   Script,
