@@ -24,8 +24,8 @@ class AddProductionPage extends React.Component {
           <div className="form-line">
             <input type="checkbox" ref="isScripted" onChange={this.scriptedChange} defaultChecked="checked"/> Is Scripted</div>
           { this.state.isScripted ? this.renderScriptedInputs() : this.renderNonScriptedInputs() }
-          <SelectPerson label="Director" api={this.props.api}/>
-          <SelectPerson label="Stage Manager" api={this.props.api}/>
+          <SelectPerson label="Director" api={this.props.api} ref="director"/>
+          <SelectPerson label="Stage Manager" api={this.props.api} ref="stageManager"/>
           <div className="form-line">
             Opening Night <input type="date" ref="opening"/></div>
           <div className="form-line">
@@ -69,6 +69,8 @@ class AddProductionPage extends React.Component {
     e.preventDefault();
 
     var space = this.refs.venue.refs.component.value().space;
+    var director = this.refs.director.refs.component.value();
+    var stageManager = this.refs.stageManager.refs.component.value();
     
     var createProduction = {
       orgId: this.props.api.producingOrganization.id,
@@ -76,6 +78,8 @@ class AddProductionPage extends React.Component {
       isSingleEvent: false,
       opening: new Date(this.refs.opening.value).getTime(),
       closing: new Date(this.refs.closing.value).getTime(),
+      directorId: director && director.id,
+      stageManagerId: stageManager && stageManager.id,
       spaceId: space && space.id,
     };
     if (createProduction.isScripted) {

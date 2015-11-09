@@ -126,6 +126,18 @@ var OrgAdmin = Relay.createContainer(OrgAdminPage, {
                 name,
               }
             },
+            director {
+              id,
+              firstName,
+              middleName,
+              lastName,
+            },
+            stageManager {
+              id,
+              firstName,
+              middleName,
+              lastName,
+            }
           },
           pastProductions {
             id,

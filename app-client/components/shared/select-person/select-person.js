@@ -3,29 +3,124 @@
 import React from 'react';
 import Relay from 'react-relay';
 import classNames from 'classnames';
+import CreatePersonMutation from './create-person-mutation';
 
 class SelectPersonComponent extends React.Component {
   state = {
     query: '',
     selected: null,
+    selectMode: true,
     menuShowing: false,
+
+    firstName: '',
+    middleName: '',
+    lastName: ''
   }
 
   render() {
     return (
       <div className="selectPerson">
-        {this.props.label}: <div className="selectPerson-controls">
-          <input ref="input" className="selectPerson-input" 
-            value={this.formatInputValue()} 
-            readOnly={this.isInputReadOnly()} 
-            onChange={this.inputOnChange}
-            onFocus={this.inputOnFocus}
-            onBlur={this.inputOnBlur}/>
-          {this.renderSelectedControls()}
-          {this.renderMenu()}
-        </div>
+        {this.props.label}: {this.state.selectMode ? this.renderSelectMode() : this.renderCreateMode()}
       </div>
     );
+  }
+
+  renderSelectMode = () => {
+    return (
+      <div className="selectPerson-controls">
+        <input ref="input" className="selectPerson-input" 
+          value={this.formatInputValue()} 
+          readOnly={this.isInputReadOnly()} 
+          onChange={this.inputOnChange}
+          onFocus={this.inputOnFocus}
+          onBlur={this.inputOnBlur}/>
+        {this.renderSelectedControls()}
+        {this.renderMenu()}
+      </div>
+      )
+  }
+
+  renderCreateMode = () => {
+    return (
+      <div className="selectPerson-controls">
+        <input 
+          ref="firstName" 
+          className="input-small" 
+          placeholder="First"
+          value={this.state.firstName}
+          onChange={this.onNameChange.bind(null, 'firstName')}/> {' '}
+        <input 
+          ref="middleName" 
+          className="input-small" 
+          placeholder="Middle"
+          value={this.state.middleName}
+          onChange={this.onNameChange.bind(null, 'middleName')}/> {' '}
+        <input 
+          ref="lastName" 
+          className="input-small" 
+          placeholder="Last"
+          value={this.state.lastName}
+          onChange={this.onNameChange.bind(null, 'lastName')}/> {' '}
+        <button onClick={this.createPerson}>Create</button> {' '}
+        <button onClick={this.cancelCreate}>Cancel</button>
+      </div>
+      )
+  }
+
+  onNameChange = (stateName, e) => {
+    var state = {};
+    state[stateName] = e.currentTarget.value;
+    this.setState(state);
+  }
+
+  cancelCreate = (e) => {
+    e.preventDefault();
+    this.setState({ selectMode: true });
+  }
+
+  createPerson = (e) => {
+    e.preventDefault();
+
+    var person = {
+      firstName: this.refs.firstName.value,
+      middleName: this.refs.middleName.value || null,
+      lastName: this.refs.lastName.value
+    };
+
+    var query = [];
+    query.push(person.firstName);
+    if (person.middleName) query.push(person.middleName);
+    query.push(person.lastName);
+
+    var mutation = new CreatePersonMutation({
+      apiId: this.props.api.id, 
+      createPerson: person
+    });
+
+    Relay.Store.update(mutation, {
+      onSuccess: result => {
+        this.props.relay.setVariables({ query: query.join(',') }, (readyState) => {
+          if (readyState.ready) {
+
+            // Without the setTimeout weirdness, this.props.api.personSearch is still empty. 
+            // Makes me think that this is not something your intended to be able to do, but
+            // I'm just not sure how to design it differently right now.
+
+            setTimeout(() => {
+              if (this.props.api.personSearch.length === 1) {
+                this.setState({ 
+                  selected: this.props.api.personSearch[0], 
+                  selectMode: true,
+                  menuShowing: false,
+                });
+              }
+            }, 100);
+          }
+        });
+      },
+      onFailure: () => console.log('create person failure')
+    });
+
   }
 
   formatInputValue = () => {
@@ -47,7 +142,7 @@ class SelectPersonComponent extends React.Component {
     this.props.relay.setVariables({ query: this.formatQueryForServer(query) });
   }
   inputOnFocus = (e) => this.setState({ menuShowing: true })
-  inputOnBlur = (e) => setTimeout(() => this.setState({ menuShowing: false }), 100)
+  inputOnBlur = (e) => setTimeout(() => this.setState({ menuShowing: false, query: '' }), 100)
   
   formatQueryForServer = q => q.replace(/^\s*(.*?)\s*$/, '$1').replace(/\s+/g, ',')
 
@@ -62,10 +157,17 @@ class SelectPersonComponent extends React.Component {
   }
 
   renderMenu = () => {
-    if (!this.state.menuShowing || this.props.api.personSearch.length === 0) return null;
+    if (!this.state.menuShowing || 
+        (this.props.api.personSearch.length === 0 && this.state.query === '')) return null;
     else return (
       <div className="selectPerson-menu">
         {this.props.api.personSearch.map(this.renderMenuItem)}
+        <div>
+          <a href="javascript:;" className="selectPerson-item"
+            onMouseDown={this.initiateCreatePerson}>
+            (Add New)
+          </a>
+        </div>
       </div>
     );
   }
@@ -78,6 +180,16 @@ class SelectPersonComponent extends React.Component {
         </a>
       </div>
     );
+  }
+
+  initiateCreatePerson = () => {
+    var splits = this.state.query.replace(/^\s*(.*?)\s*$/, '$1').split(/\s+/);
+    this.setState({
+      firstName: splits[0],
+      middleName: splits.length > 2 ? splits[1] : '',
+      lastName: splits.length > 2 ? splits[2] : splits[1] || '',
+      selectMode: false
+    });
   }
 
   selectItem = p => {

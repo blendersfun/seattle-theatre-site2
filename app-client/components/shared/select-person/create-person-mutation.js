@@ -2,19 +2,18 @@
 
 import Relay from 'react-relay';
 
-class CreateAccountMutation extends Relay.Mutation {
+class CreatePersonMutation extends Relay.Mutation {
   getMutation() {
-    return Relay.QL`mutation {createUser}`;
+    return Relay.QL`mutation {createPerson}`;
   }
   getVariables() {
-    return {createUser: this.props.createUser};
+    return {createPerson: this.props.createPerson};
   }
   getFatQuery() {
     return Relay.QL`
-      fragment on CreateUserPayload {
+      fragment on CreatePersonPayload {
         api {
-          authToken,
-          authError,
+          personSearch
         }
       }
     `;
@@ -29,4 +28,4 @@ class CreateAccountMutation extends Relay.Mutation {
   }
 }
 
-export default CreateAccountMutation;
+export default CreatePersonMutation;

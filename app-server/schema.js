@@ -152,11 +152,11 @@ var apiType = new GraphQLObjectType({
       },
       resolve: (_, {query}) => {
         if (query === '') return [];
-        
+
         var terms = query.split(',');
         return Person.search(terms);
       }
-    },
+    }
   }),
   interfaces: [nodeInterface],
 });
@@ -364,7 +364,37 @@ var personType = new GraphQLObjectType({
   interfaces: [nodeInterface],
 });
 
+/*
+ * Mutation: CreatePerson
+ *  Creates a person.
+ */
 
+var createPersonInputType = new GraphQLInputObjectType({
+  name: 'CreatePerson',
+  description: 'The input type for the CreatePerson mutation.',
+  fields: () => ({
+    firstName: { type: new GraphQLNonNull(GraphQLString) },
+    middleName: { type: GraphQLString },
+    lastName: { type: new GraphQLNonNull(GraphQLString) },
+  })
+});
+
+var createPersonMutation = mutationWithClientMutationId({
+  name: 'CreatePerson',
+  description: 'A mutation which creates a new person.',
+  inputFields: {
+    createPerson: { type: createPersonInputType },
+  },
+  outputFields: {
+    api: { 
+      type: apiType,
+      resolve: ({personId}) => Api.get()
+    }
+  },
+  mutateAndGetPayload: ({createPerson}) => 
+    Person.create(createPerson)
+      .then(personId => ({personId})),
+});
 
 
 
@@ -507,6 +537,14 @@ var productionType = new GraphQLObjectType({
     performanceSpace: {
       type: performanceSpaceType,
       resolve: ({id}) => PerformanceSpace.getByShowId(id)
+    },
+    director: {
+      type: personType,
+      resolve: ({id}) => Person.getCollaboratorWithShowAndRole(id, 3)
+    },
+    stageManager: {
+      type: personType,
+      resolve: ({id}) => Person.getCollaboratorWithShowAndRole(id, 1)
     }
   })
 });
@@ -529,6 +567,8 @@ var createProductionInputType = new GraphQLInputObjectType({
     synopsis: { type: GraphQLString },
     opening: { type: new GraphQLNonNull(GraphQLInt) },
     closing: { type: new GraphQLNonNull(GraphQLInt) },
+    directorId: { type: GraphQLID },
+    stageManagerId: { type: GraphQLID },
     spaceId: { type: GraphQLID },
   })
 });
@@ -554,6 +594,14 @@ var createProductionMutation = mutationWithClientMutationId({
     if (createProduction.spaceId) {
       var spaceIdParts = fromGlobalId(createProduction.spaceId);
       createProduction.spaceId = spaceIdParts.id;
+    }
+    if (createProduction.directorId) {
+      var directorIdParts = fromGlobalId(createProduction.directorId);
+      createProduction.directorId = directorIdParts.id;
+    }
+    if (createProduction.stageManagerId) {
+      var stageManagerIdParts = fromGlobalId(createProduction.stageManagerId);
+      createProduction.stageManagerId = stageManagerIdParts.id;
     }
 
     return new Promise((resolve, reject) => {
@@ -662,6 +710,7 @@ var mutationType = new GraphQLObjectType({
     login: loginMutation,
     createProducingOrg: createProducingOrgMutation,
     createProduction: createProductionMutation,
+    createPerson: createPersonMutation,
   })
 });
 
