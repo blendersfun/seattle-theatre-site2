@@ -364,6 +364,38 @@ var personType = new GraphQLObjectType({
   interfaces: [nodeInterface],
 });
 
+/*
+ * Mutation: CreatePerson
+ *  Creates a person.
+ */
+
+var createPersonInputType = new GraphQLInputObjectType({
+  name: 'CreatePerson',
+  description: 'The input type for the CreatePerson mutation.',
+  fields: () => ({
+    firstName: { type: new GraphQLNonNull(GraphQLString) },
+    middleName: { type: GraphQLString },
+    lastName: { type: new GraphQLNonNull(GraphQLString) },
+  })
+});
+
+var createPersonMutation = mutationWithClientMutationId({
+  name: 'CreatePerson',
+  description: 'A mutation which creates a new person.',
+  inputFields: {
+    createPerson: { type: createPersonInputType },
+  },
+  outputFields: {
+    person: { 
+      type: personType,
+      resolve: ({personId}) => Person.getById(personId)
+    }
+  },
+  mutateAndGetPayload: ({createPerson}) => 
+    Person.create(createPerson)
+      .then(personId => ({personId})),
+});
+
 
 
 
@@ -662,6 +694,7 @@ var mutationType = new GraphQLObjectType({
     login: loginMutation,
     createProducingOrg: createProducingOrgMutation,
     createProduction: createProductionMutation,
+    createPerson: createPersonMutation
   })
 });
 

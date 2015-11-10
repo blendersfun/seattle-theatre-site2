@@ -24,7 +24,8 @@ class AddProductionPage extends React.Component {
           <div className="form-line">
             <input type="checkbox" ref="isScripted" onChange={this.scriptedChange} defaultChecked="checked"/> Is Scripted</div>
           { this.state.isScripted ? this.renderScriptedInputs() : this.renderNonScriptedInputs() }
-          <SelectPerson/>
+          <SelectPerson label="Director"/>
+          <SelectPerson label="Stage Manager"/>
           <div className="form-line">
             Opening Night <input type="date" ref="opening"/></div>
           <div className="form-line">

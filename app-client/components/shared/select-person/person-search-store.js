@@ -5,18 +5,24 @@ import dispatcher from '../../../utils/dispatcher';
 
 class PersonSearchStore extends Store {
 	state = {
-		personSearch: []
+		personSearch: [],
+		query: ''
 	}
 
 	__onDispatch = (payload) => {
-		if (payload && payload.data && payload.data.api && payload.data.api.personSearch) {
-			var data = payload.data.api.personSearch;
+		if (payload && payload.results && payload.results.data && payload.results.data.api && payload.results.data.api.personSearch) {
+			var data = payload.results.data.api.personSearch;
 			this.state.personSearch = data;
+			this.state.query = payload.query;
+			this.__emitChange();
 		}
 	}
 
-	getState = () => {
+	getResults = () => {
 		return JSON.parse(JSON.stringify(this.state.personSearch)); // Deep clone so as to prevent mutation of original.
+	}
+	getQuery = () => {
+		return this.state.query;
 	}
 
 	/*
@@ -26,32 +32,76 @@ class PersonSearchStore extends Store {
 	formatQueryForServer = q => q.replace(/^\s*(.*?)\s*$/, '$1').replace(/\s+/g, ',')
 
 	search(query) {
-		var req = {};
-		req.query = `
-			query App {
-				api {
+		return new Promise((resolve, reject) => {
+			var req = {};
+			req.query = `
+				query PersonSearch { api {
 					personSearch(query: "${this.formatQueryForServer(query)}") {
 						id,
 						firstName,
 						lastName,
 						middleName
 					}
-				}
-			}
-		`;
-		req.variables = {};
+				} }
+			`;
+			req.variables = {};
 
-		var xhr = new XMLHttpRequest();
-		xhr.open('POST', '/graphql', true);
-		xhr.setRequestHeader('content-type', 'application/json');
-		xhr.send(JSON.stringify(req));
-		xhr.addEventListener('load', e => {
-			var result = JSON.parse(xhr.responseText);
-			if (result.errors) {
-				console.error('Errors encountered: ', result.errors);
-			} else {
-				dispatcher.dispatch(result);
-			}
+			var xhr = new XMLHttpRequest();
+			xhr.open('POST', '/graphql', true);
+			xhr.setRequestHeader('content-type', 'application/json');
+			xhr.send(JSON.stringify(req));
+			xhr.addEventListener('load', e => {
+				var results = JSON.parse(xhr.responseText);
+				if (results.errors) {
+					console.error('Errors encountered: ', results.errors);
+					reject();
+				} else {
+					dispatcher.dispatch({ query: query, results: results });
+					resolve();
+				}
+			});
+		});
+	}
+
+	clientMutationId = 0;
+
+	create(input) {
+		return new Promise((resolve, reject) => {
+			var req = {};
+			req.query = `
+				mutation CreatePerson($input: CreatePersonInput!) {
+					createPerson(input: $input) {
+						clientMutationId,
+						person {
+							id,
+							firstName,
+							middleName,
+							lastName
+						}
+					}
+				}
+			`;
+			req.variables = {
+				input: {
+					clientMutationId: (this.clientMutationId++) + '',
+					createPerson: input
+				}
+			};
+
+			var xhr = new XMLHttpRequest();
+			xhr.open('POST', '/graphql', true);
+			xhr.setRequestHeader('content-type', 'application/json');
+			xhr.send(JSON.stringify(req));
+			xhr.addEventListener('load', e => {
+				var results = JSON.parse(xhr.responseText);
+				if (results.errors) {
+					console.error('Errors encountered: ', results.errors);
+					reject();
+				} else {
+					var person = results.data.createPerson.person;
+					resolve(person);
+				}
+			});
 		});
 	}
 }
