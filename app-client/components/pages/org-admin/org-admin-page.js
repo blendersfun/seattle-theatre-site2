@@ -6,7 +6,7 @@ import {Link} from 'react-router';
 import classNames from 'classnames';
 import moment from 'moment';
 
-import history from '../../../history';
+import history from '../../../utils/history';
 import BasePage from '../../shared/base-page';
 
 class OrgAdminPage extends React.Component {

@@ -4,7 +4,7 @@ import React from 'react';
 import Relay from 'react-relay';
 import {Link} from 'react-router';
 import classNames from 'classnames';
-import cookie from '../cookie-manager';
+import cookie from '../../../utils/cookie-manager';
 
 class UserMenuComponent extends React.Component {
   state = {

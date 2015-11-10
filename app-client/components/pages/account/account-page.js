@@ -5,7 +5,7 @@ import Relay from 'react-relay';
 import {Link} from 'react-router';
 
 import BasePage from '../../shared/base-page';
-import history from '../../../history';
+import history from '../../../utils/history';
 
 class AccountPage extends React.Component {
   state = {

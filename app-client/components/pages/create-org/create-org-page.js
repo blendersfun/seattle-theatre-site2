@@ -7,8 +7,8 @@ import {Link} from 'react-router';
 import CreateProducingOrgMutation from './create-org-mutation';
 
 import BasePage from '../../shared/base-page';
-import cookie from '../../shared/cookie-manager';
-import history from '../../../history';
+import cookie from '../../../utils/cookie-manager';
+import history from '../../../utils/history';
 
 class CreateOrgPage extends React.Component {
   state = {

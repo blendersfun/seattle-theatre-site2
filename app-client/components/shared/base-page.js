@@ -3,7 +3,7 @@
 import React from 'react';
 import Relay from 'react-relay';
 import {Link} from 'react-router';
-import cookie from './cookie-manager';
+import cookie from '../../utils/cookie-manager';
 import {
   LoginPopup,
   showLoginPopup,

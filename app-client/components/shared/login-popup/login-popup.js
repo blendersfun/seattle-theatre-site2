@@ -5,7 +5,7 @@ import Relay from 'react-relay';
 import {Link} from 'react-router';
 import classNames from 'classnames';
 import {EventEmitter} from 'events';
-import cookie from '../cookie-manager';
+import cookie from '../../../utils/cookie-manager';
 
 import LoginMutation from './login-mutation';
 

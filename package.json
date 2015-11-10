@@ -16,6 +16,7 @@
     "cookie": "^0.2.2",
     "express": "^4.13.1",
     "express-graphql": "0.3.0",
+    "flux": "^2.1.1",
     "graphql": "0.4.2",
     "graphql-relay": "0.3.2",
     "history": "^1.12.5",

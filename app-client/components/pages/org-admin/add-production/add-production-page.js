@@ -5,8 +5,9 @@ import Relay from 'react-relay';
 import {Link} from 'react-router';
 import classNames from 'classnames';
 
-import history from '../../../../history';
+import history from '../../../../utils/history';
 import BasePage from '../../../shared/base-page';
+import SelectPerson from '../../../shared/select-person';
 import AddProductionMutation from './add-production-mutation';
 import SelectVenue from './select-venue';
 
@@ -23,6 +24,7 @@ class AddProductionPage extends React.Component {
           <div className="form-line">
             <input type="checkbox" ref="isScripted" onChange={this.scriptedChange} defaultChecked="checked"/> Is Scripted</div>
           { this.state.isScripted ? this.renderScriptedInputs() : this.renderNonScriptedInputs() }
+          <SelectPerson/>
           <div className="form-line">
             Opening Night <input type="date" ref="opening"/></div>
           <div className="form-line">

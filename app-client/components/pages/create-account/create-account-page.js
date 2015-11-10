@@ -3,8 +3,8 @@
 import React from 'react';
 import Relay from 'react-relay';
 import {Link} from 'react-router';
-import cookie from '../../shared/cookie-manager';
-import history from '../../../history';
+import cookie from '../../../utils/cookie-manager';
+import history from '../../../utils/history';
 
 import CreateAccountMutation from './create-account-mutation';
 
