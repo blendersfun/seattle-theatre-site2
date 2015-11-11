@@ -223,12 +223,12 @@ class SelectPersonContainer extends React.Component {
   }
 
   render() {
-    //console.log(this.state.personSearch);
     return (
       <SelectPerson 
         label={this.props.label}
         query={this.state.query}
-        personSearch={this.state.personSearch}/>
+        personSearch={this.state.personSearch}
+        ref="component"/>
     );
   }
 }

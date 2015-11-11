@@ -539,6 +539,14 @@ var productionType = new GraphQLObjectType({
     performanceSpace: {
       type: performanceSpaceType,
       resolve: ({id}) => PerformanceSpace.getByShowId(id)
+    },
+    director: {
+      type: personType,
+      resolve: ({id}) => Person.getCollaboratorWithShowAndRole(id, 3)
+    },
+    stageManager: {
+      type: personType,
+      resolve: ({id}) => Person.getCollaboratorWithShowAndRole(id, 1)
     }
   })
 });
@@ -561,6 +569,8 @@ var createProductionInputType = new GraphQLInputObjectType({
     synopsis: { type: GraphQLString },
     opening: { type: new GraphQLNonNull(GraphQLInt) },
     closing: { type: new GraphQLNonNull(GraphQLInt) },
+    directorId: { type: GraphQLID },
+    stageManagerId: { type: GraphQLID },
     spaceId: { type: GraphQLID },
   })
 });
@@ -586,6 +596,14 @@ var createProductionMutation = mutationWithClientMutationId({
     if (createProduction.spaceId) {
       var spaceIdParts = fromGlobalId(createProduction.spaceId);
       createProduction.spaceId = spaceIdParts.id;
+    }
+    if (createProduction.directorId) {
+      var directorIdParts = fromGlobalId(createProduction.directorId);
+      createProduction.directorId = directorIdParts.id;
+    }
+    if (createProduction.stageManagerId) {
+      var stageManagerIdParts = fromGlobalId(createProduction.stageManagerId);
+      createProduction.stageManagerId = stageManagerIdParts.id;
     }
 
     return new Promise((resolve, reject) => {

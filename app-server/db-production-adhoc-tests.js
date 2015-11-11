@@ -50,6 +50,8 @@ db.User.create({ email: "testUser1@gmail.com", password: "test123" }).then(
 			synopsis: 'Very simple narrative. Garbage is dumped onto the stage and then it ends.',
 			opening: 1456819200000,
 			closing: 1459494000000,
+			directorId: 3,
+			stageManagerId: 4,
 			spaceId: 1
 		}).then(
 			showId => ({producingOrg, user, showId})

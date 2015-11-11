@@ -9,6 +9,7 @@ import {
   toInsertId,
 } from './db-utils';
 
+import Person from './person-db';
 
 /*
  * Productions
@@ -118,9 +119,11 @@ export class Production {
           showId,
           Production._createHelper_createShowOrderWithStaging(showId, stagingId, connection),
           Production._createHelper_addShowingDate(showId, input.opening, connection),
-          input.isSingleEvent ? null : Production._createHelper_addShowingDate(showId, input.closing, connection),
-          !scriptId           ? null : Production._createHelper_makeStagingScripted(stagingId, scriptId, connection),
-          !input.spaceId      ? null : Production._createHelper_setPerformanceSpaceForShow(showId, input.spaceId, connection)
+          input.isSingleEvent   ? null : Production._createHelper_addShowingDate(showId, input.closing, connection),
+          !scriptId             ? null : Production._createHelper_makeStagingScripted(stagingId, scriptId, connection),
+          !input.spaceId        ? null : Production._createHelper_setPerformanceSpaceForShow(showId, input.spaceId, connection),
+          !input.directorId     ? null : Production._createHelper_setDirector(input.directorId, stagingId, connection),
+          !input.stageManagerId ? null : Production._createHelper_setStageManager(input.stageManagerId, stagingId, connection)
         ]).then(([showId]) => showId)
     );
   }
@@ -169,6 +172,14 @@ export class Production {
     var query = "insert into space_for_show (show_id, space_id) values (?, ?)";
     return sendQuery(query, [showId, spaceId], connection)
       .then(toInsertId);
+  }
+
+  static _createHelper_setDirector(personId, stagingId, connection) {
+    return Person.addAsCollaborator(personId, stagingId, 3, connection);
+  }
+
+  static _createHelper_setStageManager(personId, stagingId, connection) {
+    return Person.addAsCollaborator(personId, stagingId, 1, connection);
   }
 
   /*
